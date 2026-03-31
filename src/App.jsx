@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Analytics } from '@vercel/analytics/react';
 
 // ============================================================
 // DATA
@@ -651,6 +652,7 @@ export default function App() {
       >
         Book now
       </a>
+      <Analytics />
     </>
   );
 }
