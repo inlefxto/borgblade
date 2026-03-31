@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // ============================================================
 // DATA
@@ -653,6 +654,7 @@ export default function App() {
         Book now
       </a>
       <Analytics />
+      <SpeedInsights />
     </>
   );
 }
