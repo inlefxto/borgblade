@@ -93,6 +93,11 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   }, [isOpen]);
 
   useEffect(() => {
+    // warm the schema cache
+    supabase.from('bookings').select('id').limit(1);
+  }, []);
+
+  useEffect(() => {
     if (isOpen) {
       supabase.from('services').select('*').order('category').then(({ data }) => {
         if (data) setServices(data);
@@ -131,7 +136,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       staff_id: selectedStaff.id,
       booking_date: selectedDate,
       booking_time: selectedTime,
-      status: 'pending',
+      status: 'confirmed',
     });
     if (error) {
       setBookingError(error.message);
