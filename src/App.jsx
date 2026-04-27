@@ -1,36 +1,13 @@
 import { useState, useEffect, useRef } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import BookingModal from './components/BookingModal';
+import AdminDashboard from './components/AdminDashboard';
 
 // ============================================================
 // DATA
 // ============================================================
-const SETMORE_LINKS = {
-  "Haircut (Clipper)": "https://borgblade.setmore.com/book?step=staff&products=f93152ed-57ca-4aa8-b239-7844a89596f3&type=service",
-  "Skinfade Haircut": "https://borgblade.setmore.com/book?step=staff&products=813afa97-72ad-4272-852e-2ffa3c6f137b&type=service",
-  "Scissors Classic Haircut": "https://borgblade.setmore.com/book?step=staff&products=d85a4274-b6c5-4a25-b2e4-a6de0a930c77&type=service",
-  "Long Scissors Haircut": "https://borgblade.setmore.com/book?step=staff&products=39bc3366-3916-4766-a198-e8d473346758&type=service",
-  "Haircut + Wash & Style": "https://borgblade.setmore.com/book?step=staff&products=157210d8-05c1-498b-aae5-23d737deab54&type=service",
-  "Boy's Haircut (0-5 yrs)": "https://borgblade.setmore.com/book?step=staff&products=063d0a4d-2262-4970-81a4-b0f4c147b035&type=service",
-  "+65 Haircut": "https://borgblade.setmore.com/book?step=staff&products=a1d6a122-5fa0-4a2f-bb87-160c1426e4ad&type=service",
-  "Head Shave (Clipper)": "https://borgblade.setmore.com/book?step=staff&products=8040a37e-1710-4779-b311-646681a4f954&type=service",
-  "Clean Head Shave": "https://borgblade.setmore.com/book?step=staff&products=069ff87b-073c-4d2d-bfd9-425336c0abe0&type=service",
-  "Hairstyling": "https://borgblade.setmore.com/book?step=staff&products=fa99ed2a-fbbb-46b7-afa7-28dc0f9fc1cb&type=service",
-  "Beard Grooming": "https://borgblade.setmore.com/book?step=staff&products=54f37638-1394-4696-b788-b94bd4b8ee1d&type=service",
-  "Beard Clean Shave": "https://borgblade.setmore.com/book?step=staff&products=aac3b632-fe10-4779-9b8f-7b55a7d8c562&type=service",
-  "Hot Towel Beard Grooming": "https://borgblade.setmore.com/book?step=staff&products=d713bb19-7db1-4748-98c4-741761fd4a60&type=service",
-  "Premium Beard Clean Shave": "https://borgblade.setmore.com/book?step=staff&products=9d5969e4-8421-4add-bd3a-06afafcf798d&type=service",
-  "Haircut & Skinfade": "https://borgblade.setmore.com/book?step=staff&products=14da7a78-fcd5-42e4-b271-9af4341aa36e&type=service",
-  "Haircut & Beard Trim": "https://borgblade.setmore.com/book?step=staff&products=a3df6f8b-c49a-4196-bd2c-7e6940820300&type=service",
-  "Skinfade & Beard Grooming": "https://borgblade.setmore.com/book?step=staff&products=bebf3bbd-ac88-4af2-95e7-253ce0e0a146&type=service",
-  "Skin Fade & Design": "https://borgblade.setmore.com/book?step=staff&products=f7f9696d-0750-4ae7-9286-bc11eb482b91&type=service",
-  "Haircut, Eyebrows & Beard": "https://borgblade.setmore.com/book?step=staff&products=af9cd147-0af5-4ea7-beb6-ebe4743df4ab&type=service",
-  "Full Service (Haircut + Facial + Eyebrows)": "https://borgblade.setmore.com/book?step=staff&products=4632511b-2a0c-4265-8b8c-acdf038b00a2&type=service",
-  "Eyebrows": "https://borgblade.setmore.com/book?step=staff&products=d6e73ff6-77f5-4839-bec3-ee4680ebfd8b&type=service",
-  "Eyebrows, Ears & Nose Waxing": "https://borgblade.setmore.com/book?step=staff&products=188f4788-1426-4466-b424-8bebed92f874&type=service",
-  "Ears & Nose Waxing": "https://borgblade.setmore.com/book?step=staff&products=f9b54b02-e496-429b-a10c-657a4e291724&type=service",
-};
-
 const BARBERS = [
   {
     id: "marco",
@@ -113,7 +90,7 @@ function genRef() {
 // ============================================================
 // SERVICE CARD
 // ============================================================
-function ServiceCard({ name, price, duration, openBooking }) {
+function ServiceCard({ name, price, duration, openBookingModal }) {
   return (
     <div className="service-card">
       <div className="sc-top">
@@ -122,7 +99,7 @@ function ServiceCard({ name, price, duration, openBooking }) {
       </div>
       <div className="sc-right">
         <span className="sc-price">€{price}</span>
-        <button className="sc-book-btn" onClick={() => openBooking(SETMORE_LINKS[name])}>Book</button>
+        <button className="sc-book-btn" onClick={() => openBookingModal()}>Book</button>
       </div>
     </div>
   );
@@ -131,12 +108,15 @@ function ServiceCard({ name, price, duration, openBooking }) {
 // ============================================================
 // MAIN APP
 // ============================================================
-export default function App() {
+function MainSite() {
   const [scrolled, setScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState("Haircuts");
   const [activeSection, setActiveSection] = useState("home");
   const [menuOpen, setMenuOpen] = useState(false);
   const [open] = useState(isOpenNow());
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+
+  const openBookingModal = () => setBookingModalOpen(true);
 
   const homeRef = useRef(null);
   const aboutRef = useRef(null);
@@ -145,18 +125,6 @@ export default function App() {
   const findusRef = useRef(null);
 
   const sectionRefs = { home: homeRef, about: aboutRef, services: servicesRef, gallery: galleryRef, findus: findusRef };
-
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.id = 'anywhere_book_now_script';
-    script.src = 'https://assets.setmore.com/integration/book-now/live/v1/anywhere-book-now.js';
-    script.async = true;
-    document.body.appendChild(script);
-    return () => {
-      const existing = document.getElementById('anywhere_book_now_script');
-      if (existing) existing.remove();
-    };
-  }, []);
 
   useEffect(() => {
     const onScroll = () => {
@@ -175,14 +143,6 @@ export default function App() {
   const scrollTo = (id) => {
     setMenuOpen(false);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const openBooking = (url = 'https://borgblade.setmore.com') => {
-    const btn = document.getElementById('Setmore_button_iframe');
-    if (btn) {
-      btn.setAttribute('href', url);
-      btn.click();
-    }
   };
 
   const navLinks = [
@@ -400,7 +360,7 @@ export default function App() {
           ))}
         </ul>
         <div className="nav-right">
-          <button className="btn-nav" onClick={() => openBooking()}>Book Now</button>
+          <button className="btn-nav" onClick={() => openBookingModal()}>Book Now</button>
           <button className={"hamburger " + (menuOpen ? "open" : "")} onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
             <span /><span /><span />
           </button>
@@ -413,7 +373,7 @@ export default function App() {
           <button key={id} onClick={() => scrollTo(id)}>{label}</button>
         ))}
         <div className="mobile-cta-wrap">
-          <button className="btn-gold" onClick={() => openBooking()}>Book an Appointment</button>
+          <button className="btn-gold" onClick={() => openBookingModal()}>Book an Appointment</button>
         </div>
       </div>
 
@@ -427,7 +387,7 @@ export default function App() {
             <h1 className="hero-title">BORG<br /><span>&</span><br />BLADE</h1>
             <p className="hero-sub">Sharp cuts. No compromises.</p>
             <div className="hero-cta">
-              <button className="btn-gold" onClick={() => openBooking()}>Book an Appointment</button>
+              <button className="btn-gold" onClick={() => openBookingModal()}>Book an Appointment</button>
             </div>
             <p className="hero-location">Tue – Sat &nbsp;·&nbsp; 09:00 – 19:00</p>
           </div>
@@ -522,12 +482,12 @@ export default function App() {
           </div>
           <div className="services-grid">
             {SERVICES[activeTab].map((s) => (
-              <ServiceCard key={s.name} {...s} openBooking={openBooking} />
+              <ServiceCard key={s.name} {...s} openBookingModal={openBookingModal} />
             ))}
           </div>
           <div className="services-cta">
             <p>Ready to book your next visit?</p>
-            <button className="btn-gold" onClick={() => openBooking()}>Book an Appointment</button>
+            <button className="btn-gold" onClick={() => openBookingModal()}>Book an Appointment</button>
           </div>
         </div>
       </div>
@@ -617,7 +577,7 @@ export default function App() {
                 <li><button onClick={() => scrollTo("services")}>Services</button></li>
                 <li><button onClick={() => scrollTo("gallery")}>Gallery</button></li>
                 <li><button onClick={() => scrollTo("findus")}>Find Us</button></li>
-                <li><button onClick={() => openBooking()}>Book Now</button></li>
+                <li><button onClick={() => openBookingModal()}>Book Now</button></li>
               </ul>
             </div>
             <div className="footer-col">
@@ -642,19 +602,23 @@ export default function App() {
 
       {/* MOBILE STICKY CTA */}
       <div className="mobile-sticky-cta">
-        <button className="btn-gold" onClick={() => openBooking()}>Book an Appointment</button>
+        <button className="btn-gold" onClick={() => openBookingModal()}>Book an Appointment</button>
       </div>
 
-      <a
-        id="Setmore_button_iframe"
-        href="https://borgblade.setmore.com"
-        style={{ display: 'none' }}
-        data-new-tab="false"
-      >
-        Book now
-      </a>
+      <BookingModal isOpen={bookingModalOpen} onClose={() => setBookingModalOpen(false)} />
       <Analytics />
       <SpeedInsights />
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<MainSite />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
