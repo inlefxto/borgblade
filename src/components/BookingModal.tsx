@@ -128,13 +128,13 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setSubmitting(true);
     setBookingError('');
     const { error } = await supabase.from('bookings').insert({
-      booking_ref: `BB-${Date.now()}`,
       client_name: clientName,
       client_email: clientEmail,
       service_id: selectedService.id,
       staff_id: selectedStaff.id,
       booking_date: selectedDate,
       time_slot: selectedTime,
+      booking_ref: `BB-${Date.now()}`,
       status: 'confirmed',
     });
     if (error) {
