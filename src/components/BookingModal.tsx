@@ -132,29 +132,17 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       status: 'pending',
     });
     if (!error) {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-      const supabaseKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/send-confirmation`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Apikey': supabaseKey,
-          },
-          body: JSON.stringify({
-            clientName,
-            clientEmail,
-            serviceName: selectedService.name,
-            barberName: selectedStaff.name,
-            date: selectedDate,
-            time: selectedTime,
-            price: selectedService.price,
-            duration: selectedService.duration,
-            ref,
-          }),
-        });
-      } catch (_) {}
+      console.log('Booking confirmed:', {
+        ref,
+        clientName,
+        clientEmail,
+        service: selectedService.name,
+        barber: selectedStaff.name,
+        date: selectedDate,
+        time: selectedTime,
+        price: selectedService.price,
+        duration: selectedService.duration,
+      });
       setBookingRef(ref);
       setStep(6);
     }
@@ -498,26 +486,31 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           {step === 6 && (
             <div style={{ textAlign: 'center', padding: '32px 0' }}>
               <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(201,168,76,0.1)', border: '2px solid #C9A84C', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: 28, color: '#C9A84C' }}>✓</div>
-              <h2 style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '2rem', letterSpacing: '0.06em', color: '#F2F2F2', marginBottom: 8 }}>Booking Confirmed</h2>
+              <h2 style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '2rem', letterSpacing: '0.06em', color: '#F2F2F2', marginBottom: 8 }}>Booking Confirmed!</h2>
               <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: 24 }}>Reference: <span style={{ color: '#C9A84C', fontWeight: 600 }}>{bookingRef}</span></p>
-              <div style={{ background: '#181818', border: '1px solid #222', padding: '20px', marginBottom: 24, textAlign: 'left' }}>
+              <div style={{ background: '#181818', border: '1px solid #222', padding: '20px', marginBottom: 20, textAlign: 'left' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#888', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Service</span>
-                    <span style={{ color: '#F2F2F2', fontSize: '0.9rem' }}>{selectedService?.name}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#888', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Barber</span>
-                    <span style={{ color: '#F2F2F2', fontSize: '0.9rem' }}>{selectedStaff?.name}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#888', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Date & Time</span>
-                    <span style={{ color: '#F2F2F2', fontSize: '0.9rem' }}>{formatDisplayDate(selectedDate)} at {selectedTime}</span>
-                  </div>
+                  {[
+                    { label: 'Service', value: selectedService?.name },
+                    { label: 'Duration', value: selectedService?.duration },
+                    { label: 'Price', value: `€${selectedService?.price}` },
+                    { label: 'Barber', value: selectedStaff?.name },
+                    { label: 'Date', value: formatDisplayDate(selectedDate) },
+                    { label: 'Time', value: selectedTime },
+                    { label: 'Name', value: clientName },
+                    { label: 'Email', value: clientEmail },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, borderBottom: '1px solid #1e1e1e', paddingBottom: 10 }}>
+                      <span style={{ fontSize: '0.7rem', color: '#888', letterSpacing: '0.08em', textTransform: 'uppercase', flexShrink: 0 }}>{label}</span>
+                      <span style={{ color: '#F2F2F2', fontSize: '0.88rem', textAlign: 'right' }}>{value}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <p style={{ color: '#888', fontSize: '0.82rem', lineHeight: 1.7 }}>
-                A confirmation email has been sent to <span style={{ color: '#F2F2F2' }}>{clientEmail}</span>.<br />
+              <p style={{ color: '#C9A84C', fontSize: '0.82rem', lineHeight: 1.7, marginBottom: 8 }}>
+                You will receive a confirmation shortly.
+              </p>
+              <p style={{ color: '#666', fontSize: '0.78rem', lineHeight: 1.7 }}>
                 We look forward to seeing you!
               </p>
             </div>
