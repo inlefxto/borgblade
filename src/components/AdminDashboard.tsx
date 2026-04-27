@@ -6,7 +6,7 @@ interface Booking {
   client_name: string;
   client_email: string;
   booking_date: string;
-  booking_time: string;
+  time_slot: string;
   status: string;
   created_at: string;
   services: { name: string; price: number; duration: string } | null;
@@ -44,7 +44,7 @@ export default function AdminDashboard() {
       .from('bookings')
       .select('*, services(name, price, duration), staff(name)')
       .order('booking_date', { ascending: false })
-      .order('booking_time', { ascending: false });
+      .order('time_slot', { ascending: false });
     if (data) setBookings(data as Booking[]);
     setLoading(false);
   };
@@ -198,7 +198,7 @@ export default function AdminDashboard() {
                       <td style={{ padding: '14px 16px', fontSize: '0.85rem', color: '#F2F2F2', whiteSpace: 'nowrap' }}>
                         {new Date(booking.booking_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: '0.85rem', color: '#F2F2F2', whiteSpace: 'nowrap' }}>{booking.booking_time}</td>
+                      <td style={{ padding: '14px 16px', fontSize: '0.85rem', color: '#F2F2F2', whiteSpace: 'nowrap' }}>{booking.time_slot}</td>
                       <td style={{ padding: '14px 16px', fontSize: '0.85rem', color: '#F2F2F2', whiteSpace: 'nowrap' }}>{booking.client_name}</td>
                       <td style={{ padding: '14px 16px', fontSize: '0.82rem', color: '#888', whiteSpace: 'nowrap' }}>{booking.client_email}</td>
                       <td style={{ padding: '14px 16px', fontSize: '0.82rem', color: '#F2F2F2' }}>

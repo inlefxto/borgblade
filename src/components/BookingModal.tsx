@@ -77,7 +77,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [bookingRef, setBookingRef] = useState('');
   const [bookingError, setBookingError] = useState('');
 
   useEffect(() => {
@@ -89,7 +88,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setSelectedTime('');
     setClientName('');
     setClientEmail('');
-    setBookingRef('');
+    setBookingError('');
   }, [isOpen]);
 
   useEffect(() => {
@@ -113,12 +112,12 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       setLoading(true);
       supabase
         .from('bookings')
-        .select('booking_time')
+        .select('time_slot')
         .eq('staff_id', selectedStaff.id)
         .eq('booking_date', selectedDate)
         .neq('status', 'cancelled')
         .then(({ data }) => {
-          setBookedSlots(data ? data.map((b) => b.booking_time) : []);
+          setBookedSlots(data ? data.map((b) => b.time_slot) : []);
           setLoading(false);
         });
     }
@@ -128,20 +127,18 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     if (!selectedService || !selectedStaff || !selectedDate || !selectedTime || !clientName || !clientEmail) return;
     setSubmitting(true);
     setBookingError('');
-    const ref = 'BB-' + Math.floor(10000 + Math.random() * 90000);
     const { error } = await supabase.from('bookings').insert({
       client_name: clientName,
       client_email: clientEmail,
       service_id: selectedService.id,
       staff_id: selectedStaff.id,
       booking_date: selectedDate,
-      booking_time: selectedTime,
+      time_slot: selectedTime,
       status: 'confirmed',
     });
     if (error) {
       setBookingError(error.message);
     } else {
-      setBookingRef(ref);
       setStep(6);
     }
     setSubmitting(false);
@@ -487,8 +484,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           {step === 6 && (
             <div style={{ textAlign: 'center', padding: '32px 0' }}>
               <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(201,168,76,0.1)', border: '2px solid #C9A84C', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: 28, color: '#C9A84C' }}>✓</div>
-              <h2 style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '2rem', letterSpacing: '0.06em', color: '#F2F2F2', marginBottom: 8 }}>Booking Confirmed!</h2>
-              <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: 24 }}>Reference: <span style={{ color: '#C9A84C', fontWeight: 600 }}>{bookingRef}</span></p>
+              <h2 style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '2rem', letterSpacing: '0.06em', color: '#F2F2F2', marginBottom: 24 }}>Booking Confirmed!</h2>
               <div style={{ background: '#181818', border: '1px solid #222', padding: '20px', marginBottom: 20, textAlign: 'left' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {[
