@@ -78,6 +78,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [bookingRef, setBookingRef] = useState('');
+  const [bookingError, setBookingError] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -121,6 +122,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const handleConfirm = async () => {
     if (!selectedService || !selectedStaff || !selectedDate || !selectedTime || !clientName || !clientEmail) return;
     setSubmitting(true);
+    setBookingError('');
     const ref = 'BB-' + Math.floor(10000 + Math.random() * 90000);
     const { error } = await supabase.from('bookings').insert({
       client_name: clientName,
@@ -131,18 +133,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       booking_time: selectedTime,
       status: 'pending',
     });
-    if (!error) {
-      console.log('Booking confirmed:', {
-        ref,
-        clientName,
-        clientEmail,
-        service: selectedService.name,
-        barber: selectedStaff.name,
-        date: selectedDate,
-        time: selectedTime,
-        price: selectedService.price,
-        duration: selectedService.duration,
-      });
+    if (error) {
+      setBookingError(error.message);
+    } else {
       setBookingRef(ref);
       setStep(6);
     }
@@ -227,6 +220,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
   const stepLabels = ['Service', 'Barber', 'Date & Time', 'Details', 'Confirm'];
 
+
   const canNext =
     (step === 1 && !!selectedService) ||
     (step === 2 && !!selectedStaff) ||
@@ -234,6 +228,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     (step === 4 && clientName.trim().length > 1 && /\S+@\S+\.\S+/.test(clientEmail));
 
   return (
+    <>
+    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
@@ -535,11 +531,21 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 style={{ background: canNext ? '#C9A84C' : '#1e1e1e', border: 'none', color: canNext ? '#0A0A0A' : '#444', padding: '12px 32px', cursor: canNext ? 'pointer' : 'default', fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '0.08em', transition: 'background 0.2s' }}
               >Continue</button>
             ) : (
-              <button
-                onClick={handleConfirm}
-                disabled={submitting}
-                style={{ background: submitting ? '#1e1e1e' : '#C9A84C', border: 'none', color: submitting ? '#444' : '#0A0A0A', padding: '12px 32px', cursor: submitting ? 'default' : 'pointer', fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '0.08em', transition: 'background 0.2s' }}
-              >{submitting ? 'Confirming...' : 'Confirm Booking'}</button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                {bookingError && (
+                  <p style={{ color: '#f87171', fontSize: '0.78rem', textAlign: 'right', maxWidth: 320 }}>{bookingError}</p>
+                )}
+                <button
+                  onClick={handleConfirm}
+                  disabled={submitting}
+                  style={{ background: submitting ? '#1e1e1e' : '#C9A84C', border: 'none', color: submitting ? '#888' : '#0A0A0A', padding: '12px 32px', cursor: submitting ? 'default' : 'pointer', fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '0.08em', transition: 'background 0.2s', display: 'flex', alignItems: 'center', gap: 10, minWidth: 180, justifyContent: 'center' }}
+                >
+                  {submitting && (
+                    <span style={{ width: 14, height: 14, border: '2px solid #888', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+                  )}
+                  {submitting ? 'Confirming...' : 'Confirm Booking'}
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -553,5 +559,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         )}
       </div>
     </div>
+    </>
   );
 }
