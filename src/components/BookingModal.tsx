@@ -61,7 +61,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [step, setStep] = useState(1);
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
-  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+
 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
@@ -75,6 +75,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     return { year: now.getFullYear(), month: now.getMonth() };
   });
 
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState('');
@@ -86,6 +87,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setSelectedStaff(null);
     setSelectedDate('');
     setSelectedTime('');
+    setTimeSlots([]);
     setClientName('');
     setClientEmail('');
     setBookingError('');
@@ -110,19 +112,30 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   useEffect(() => {
     if (step === 3 && selectedStaff && selectedDate) {
       setLoading(true);
-      supabase
-        .from('bookings')
-        .select('time_slot')
-        .eq('staff_id', selectedStaff.id)
-        .eq('booking_date', selectedDate)
-        .neq('status', 'cancelled')
-        .then(({ data }) => {
-          const normalized = (data || []).map((b) => b.time_slot.substring(0, 5));
-          console.log('Booked slots:', normalized);
-          console.log('Generated slots:', generateTimeSlots());
-          setBookedSlots(normalized);
-          setLoading(false);
-        });
+      (async () => {
+        const { data: existingBookings } = await supabase
+          .from('bookings')
+          .select('time_slot')
+          .eq('staff_id', selectedStaff.id)
+          .eq('booking_date', selectedDate)
+          .neq('status', 'cancelled');
+
+        console.log('Raw existing bookings:', existingBookings);
+
+        const bookedSlots = (existingBookings || []).map(b =>
+          String(b.time_slot).substring(0, 5)
+        );
+
+        console.log('Booked slots normalized:', bookedSlots);
+
+        const allSlots = generateTimeSlots();
+        const availableSlots = allSlots.filter(slot => !bookedSlots.includes(slot));
+
+        console.log('Available slots after filter:', availableSlots);
+
+        setTimeSlots(availableSlots);
+        setLoading(false);
+      })();
     }
   }, [step, selectedStaff, selectedDate]);
 
@@ -170,8 +183,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     if (items.length) acc[cat] = items;
     return acc;
   }, {} as Record<string, Service[]>);
-
-  const timeSlots = generateTimeSlots();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -425,21 +436,19 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
                       {timeSlots.map((slot) => {
-                        const booked = bookedSlots.includes(slot);
                         const sel = selectedTime === slot;
                         return (
                           <button
                             key={slot}
-                            onClick={() => !booked && setSelectedTime(slot)}
+                            onClick={() => setSelectedTime(slot)}
                             style={{
                               padding: '10px 0',
-                              background: sel ? '#C9A84C' : booked ? '#111' : '#181818',
-                              border: sel ? 'none' : booked ? '1px solid #1a1a1a' : '1px solid #333',
-                              color: sel ? '#0A0A0A' : booked ? '#333' : '#F2F2F2',
-                              cursor: booked ? 'default' : 'pointer',
+                              background: sel ? '#C9A84C' : '#181818',
+                              border: sel ? 'none' : '1px solid #333',
+                              color: sel ? '#0A0A0A' : '#F2F2F2',
+                              cursor: 'pointer',
                               fontSize: '0.85rem',
                               fontWeight: sel ? 700 : 400,
-                              textDecoration: booked ? 'line-through' : 'none',
                               transition: 'all 0.15s',
                             }}
                           >
