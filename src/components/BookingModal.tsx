@@ -127,9 +127,12 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     if (!selectedService || !selectedStaff || !selectedDate || !selectedTime || !clientName || !clientEmail) return;
     setSubmitting(true);
     setBookingError('');
+    console.log('Inserting:', clientName, clientEmail, selectedService, selectedStaff, selectedDate, selectedTime);
     const { error } = await supabase.from('bookings').insert({
       client_name: clientName,
+      customer_name: clientName,
       client_email: clientEmail,
+      customer_email: clientEmail,
       service_id: selectedService.id,
       staff_id: selectedStaff.id,
       booking_date: selectedDate,
