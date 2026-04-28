@@ -117,7 +117,10 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         .eq('booking_date', selectedDate)
         .neq('status', 'cancelled')
         .then(({ data }) => {
-          setBookedSlots(data ? data.map((b) => b.time_slot) : []);
+          const normalized = (data || []).map((b) => b.time_slot.substring(0, 5));
+          console.log('Booked slots:', normalized);
+          console.log('Generated slots:', generateTimeSlots());
+          setBookedSlots(normalized);
           setLoading(false);
         });
     }
