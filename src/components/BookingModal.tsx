@@ -13,7 +13,7 @@ interface Staff {
   id: string;
   name: string;
   role: string;
-  avatar: string;
+  photo_url: string | null;
 }
 
 interface BookingModalProps {
@@ -367,11 +367,32 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         width: '100%',
                       }}
                     >
-                      <img
-                        src={b.avatar}
-                        alt={b.name}
-                        style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: sel ? '2px solid #C9A84C' : '2px solid #333', flexShrink: 0 }}
-                      />
+                      {b.photo_url ? (
+                        <img
+                          src={b.photo_url}
+                          alt={b.name}
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.nextSibling as HTMLElement).style.display = 'flex'; }}
+                          style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: sel ? '2px solid #C9A84C' : '2px solid #333', flexShrink: 0 }}
+                        />
+                      ) : null}
+                      <div
+                        style={{
+                          width: 56, height: 56, borderRadius: '50%',
+                          background: '#1e1e1e',
+                          border: sel ? '2px solid #C9A84C' : '2px solid #333',
+                          flexShrink: 0,
+                          display: b.photo_url ? 'none' : 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#C9A84C',
+                          fontSize: '1.1rem',
+                          fontWeight: 700,
+                          letterSpacing: '0.05em',
+                          fontFamily: 'DM Sans, sans-serif',
+                        }}
+                      >
+                        {b.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
                       <div>
                         <div style={{ color: '#F2F2F2', fontSize: '0.95rem', fontWeight: 600 }}>{b.name}</div>
                         <div style={{ color: '#C9A84C', fontSize: '0.75rem', marginTop: 3, letterSpacing: '0.05em' }}>{b.role}</div>
