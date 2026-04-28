@@ -145,6 +145,19 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       setSubmitting(false);
       throw error;
     }
+    await fetch('/api/send-confirmation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientName,
+        clientEmail,
+        serviceName: selectedService.name,
+        barberName: selectedStaff.name,
+        date: selectedDate,
+        time: selectedTime,
+        bookingRef: `BB-${Date.now()}`
+      })
+    });
     setStep(6);
     setSubmitting(false);
   };
