@@ -128,11 +128,10 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setSubmitting(true);
     setBookingError('');
     console.log('Inserting:', clientName, clientEmail, selectedService, selectedStaff, selectedDate, selectedTime);
+    await supabase.from('bookings').select('id').limit(1);
     const { error } = await supabase.from('bookings').insert({
       client_name: clientName,
-      customer_name: clientName,
       client_email: clientEmail,
-      customer_email: clientEmail,
       service_id: selectedService.id,
       staff_id: selectedStaff.id,
       booking_date: selectedDate,
@@ -141,10 +140,12 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       status: 'confirmed',
     });
     if (error) {
+      console.error('Insert error:', JSON.stringify(error));
       setBookingError(error.message);
-    } else {
-      setStep(6);
+      setSubmitting(false);
+      throw error;
     }
+    setStep(6);
     setSubmitting(false);
   };
 
