@@ -12,7 +12,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: 'onboarding@resend.dev',
+      from: 'bookings@borgblade.com',
       to: [clientEmail],
       subject: 'Booking Confirmed — Borg & Blade',
       html: `<h2>Booking Confirmed!</h2>
@@ -38,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: 'onboarding@resend.dev',
+      from: 'bookings@borgblade.com',
       to: ['nicholaidebono@gmail.com'],
       subject: `New Booking — ${clientName}`,
       html: `<h2>New Booking Received</h2>
