@@ -5,10 +5,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { clientName, clientEmail, serviceName, barberName, date, time, bookingRef } = req.body;
 
-  const variables = { clientName, serviceName, barberName, date, time, bookingRef };
-
   // Confirmation email to client
-  await fetch('https://api.resend.com/emails', {
+  const clientEmailResponse = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
@@ -19,9 +17,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       to: [clientEmail],
       subject: 'Booking Confirmed — Borg & Blade',
       template_id: 'ff31a327-00ab-4a0c-a831-bd7cd106ae44',
-      variables
+      variables: { clientName, serviceName, barberName, date, time, bookingRef }
     })
   });
+  const clientEmailResult = await clientEmailResponse.json();
+  console.log('Resend client email response:', JSON.stringify(clientEmailResult));
 
   // Admin notification
   await fetch('https://api.resend.com/emails', {
@@ -42,5 +42,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   });
 
-  res.status(200).json({ success: true });
+  res.status(200).json({ clientEmailResult });
 }
