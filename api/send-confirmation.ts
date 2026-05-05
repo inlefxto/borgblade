@@ -5,7 +5,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { clientName, clientEmail, serviceName, barberName, date, time, bookingRef } = req.body;
 
-  const response = await fetch('https://api.resend.com/emails', {
+  const variables = { clientName, serviceName, barberName, date, time, bookingRef };
+
+  // Confirmation email to client
+  await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
@@ -15,22 +18,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       from: 'bookings@borgblade.com',
       to: [clientEmail],
       subject: 'Booking Confirmed — Borg & Blade',
-      html: `<h2>Booking Confirmed!</h2>
-        <p>Hi ${clientName},</p>
-        <p>Your appointment has been confirmed.</p>
-        <ul>
-          <li><strong>Service:</strong> ${serviceName}</li>
-          <li><strong>Barber:</strong> ${barberName}</li>
-          <li><strong>Date:</strong> ${date}</li>
-          <li><strong>Time:</strong> ${time}</li>
-          <li><strong>Reference:</strong> ${bookingRef}</li>
-        </ul>
-        <p>See you soon!</p>
-        <p>Borg & Blade</p>`
+      template_id: 'ff31a327-00ab-4a0c-a831-bd7cd106ae44',
+      variables
     })
   });
 
-  // Send admin notification
+  // Admin notification
   await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -41,18 +34,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       from: 'bookings@borgblade.com',
       to: ['nicholaidebono@gmail.com'],
       subject: `New Booking — ${clientName}`,
-      html: `<h2>New Booking Received</h2>
-        <ul>
-          <li><strong>Client:</strong> ${clientName} (${clientEmail})</li>
-          <li><strong>Service:</strong> ${serviceName}</li>
-          <li><strong>Barber:</strong> ${barberName}</li>
-          <li><strong>Date:</strong> ${date}</li>
-          <li><strong>Time:</strong> ${time}</li>
-          <li><strong>Reference:</strong> ${bookingRef}</li>
-        </ul>`
+      html: `<p>New booking from <strong>${clientName}</strong> (${clientEmail})<br>
+             Service: ${serviceName}<br>
+             Barber: ${barberName}<br>
+             Date: ${date} at ${time}<br>
+             Ref: ${bookingRef}</p>`
     })
   });
 
-  const data = await response.json();
-  res.status(200).json(data);
+  res.status(200).json({ success: true });
 }
