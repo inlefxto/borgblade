@@ -5,7 +5,7 @@ interface Service {
   id: string;
   name: string;
   category: string;
-  duration: string;
+  duration_mins: number;
   price: number;
 }
 
@@ -50,6 +50,13 @@ function formatDisplayDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-').map(Number);
   const date = new Date(year, month - 1, day);
   return date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
+}
+
+function formatDuration(mins: number): string {
+  if (mins < 60) return `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  const remaining = mins % 60;
+  return remaining > 0 ? `${hours} hr ${remaining} min` : `${hours} hr`;
 }
 
 function getDaysInMonth(year: number, month: number): number {
@@ -105,7 +112,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
   useEffect(() => {
     if (isOpen) {
-      supabase.from('services').select('*').order('category').then(({ data }) => {
+      supabase.from('services').select('id, name, duration_mins, price, category').order('category').then(({ data }) => {
         if (data) setServices(data);
       });
       supabase.from('staff').select('*').then(({ data }) => {
@@ -188,6 +195,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         clientEmail,
         clientPhone,
         serviceName: selectedService.name,
+        duration: formatDuration(selectedService.duration_mins),
         barberName: selectedStaff.name,
         date: selectedDate,
         time: selectedTime,
@@ -367,7 +375,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         >
                           <div>
                             <div style={{ color: '#F2F2F2', fontSize: '0.9rem', fontWeight: 500 }}>{svc.name}</div>
-                            <div style={{ color: '#888', fontSize: '0.75rem', marginTop: 2 }}>{svc.duration}</div>
+                            <div style={{ color: '#888', fontSize: '0.75rem', marginTop: 2 }}>{formatDuration(svc.duration_mins)}</div>
                           </div>
                           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1.5rem', color: '#C9A84C', flexShrink: 0, marginLeft: 16 }}>€{svc.price}</div>
                         </button>
@@ -545,7 +553,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {[
                     { label: 'Service', value: selectedService.name },
-                    { label: 'Duration', value: selectedService.duration },
+                    { label: 'Duration', value: formatDuration(selectedService.duration_mins) },
                     { label: 'Price', value: `€${selectedService.price}` },
                     { label: 'Barber', value: selectedStaff.name },
                     { label: 'Date', value: formatDisplayDate(selectedDate) },
@@ -576,7 +584,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {[
                     { label: 'Service', value: selectedService?.name },
-                    { label: 'Duration', value: selectedService?.duration },
+                    { label: 'Duration', value: selectedService ? formatDuration(selectedService.duration_mins) : '' },
                     { label: 'Price', value: `€${selectedService?.price}` },
                     { label: 'Barber', value: selectedStaff?.name },
                     { label: 'Date', value: formatDisplayDate(selectedDate) },
