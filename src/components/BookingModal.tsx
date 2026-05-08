@@ -129,7 +129,20 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         console.log('Booked slots normalized:', bookedSlots);
 
         const allSlots = generateTimeSlots();
-        const availableSlots = allSlots.filter(slot => !bookedSlots.includes(slot));
+        const now = new Date();
+        const isToday = selectedDate === now.toLocaleDateString('en-CA');
+
+        const availableSlots = allSlots.filter(slot => {
+          if (bookedSlots.includes(slot)) return false;
+          if (isToday) {
+            const [hours, minutes] = slot.split(':').map(Number);
+            const slotTime = new Date();
+            slotTime.setHours(hours, minutes, 0, 0);
+            const bufferTime = new Date(now.getTime() + 30 * 60 * 1000);
+            return slotTime > bufferTime;
+          }
+          return true;
+        });
 
         console.log('Available slots after filter:', availableSlots);
 
