@@ -72,6 +72,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
 
   const [calMonth, setCalMonth] = useState(() => {
     const now = new Date();
@@ -93,6 +94,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setTimeSlots([]);
     setClientName('');
     setClientEmail('');
+    setClientPhone('');
     setBookingError('');
   }, [isOpen]);
 
@@ -164,6 +166,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     const { error } = await supabase.from('bookings').insert({
       client_name: clientName,
       client_email: clientEmail,
+      client_phone: clientPhone,
       service_id: selectedService.id,
       staff_id: selectedStaff.id,
       booking_date: selectedDate,
@@ -183,6 +186,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       body: JSON.stringify({
         clientName,
         clientEmail,
+        clientPhone,
         serviceName: selectedService.name,
         barberName: selectedStaff.name,
         date: selectedDate,
@@ -514,6 +518,21 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     }}
                   />
                 </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#C9A84C', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Phone Number</label>
+                  <input
+                    type="tel"
+                    placeholder="Phone Number"
+                    value={clientPhone}
+                    onChange={(e) => setClientPhone(e.target.value)}
+                    style={{
+                      width: '100%', padding: '12px 16px',
+                      background: '#181818', border: '1px solid #333',
+                      color: '#F2F2F2', fontSize: '0.95rem',
+                      outline: 'none', fontFamily: 'DM Sans, sans-serif',
+                    }}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -533,6 +552,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     { label: 'Time', value: selectedTime },
                     { label: 'Name', value: clientName },
                     { label: 'Email', value: clientEmail },
+                    { label: 'Phone', value: clientPhone },
                   ].map(({ label, value }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
                       <span style={{ fontSize: '0.72rem', color: '#888', letterSpacing: '0.1em', textTransform: 'uppercase', flexShrink: 0 }}>{label}</span>
@@ -563,6 +583,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     { label: 'Time', value: selectedTime },
                     { label: 'Name', value: clientName },
                     { label: 'Email', value: clientEmail },
+                    { label: 'Phone', value: clientPhone },
                   ].map(({ label, value }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, borderBottom: '1px solid #1e1e1e', paddingBottom: 10 }}>
                       <span style={{ fontSize: '0.7rem', color: '#888', letterSpacing: '0.08em', textTransform: 'uppercase', flexShrink: 0 }}>{label}</span>
