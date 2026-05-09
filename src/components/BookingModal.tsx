@@ -19,6 +19,7 @@ interface Staff {
 interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
+  preSelectedService?: Service | null;
 }
 
 const serviceDescriptions: Record<string, string> = {
@@ -99,7 +100,7 @@ function getFirstDayOfMonth(year: number, month: number): number {
   return new Date(year, month, 1).getDay();
 }
 
-export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
+export default function BookingModal({ isOpen, onClose, preSelectedService }: BookingModalProps) {
   const [step, setStep] = useState(1);
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -125,8 +126,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
   useEffect(() => {
     if (!isOpen) return;
-    setStep(1);
-    setSelectedService(null);
     setSelectedStaff(null);
     setSelectedDate('');
     setSelectedTime('');
@@ -135,7 +134,14 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setClientEmail('');
     setClientPhone('');
     setBookingError('');
-  }, [isOpen]);
+    if (preSelectedService) {
+      setSelectedService(preSelectedService);
+      setStep(2);
+    } else {
+      setSelectedService(null);
+      setStep(1);
+    }
+  }, [isOpen, preSelectedService]);
 
   useEffect(() => {
     // warm the schema cache

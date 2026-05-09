@@ -5,6 +5,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import BookingModal from './components/BookingModal';
 import AdminDashboard from './components/AdminDashboard';
 import CancelPage from './components/CancelPage';
+import { supabase } from './lib/supabase';
 
 // ============================================================
 // DATA
@@ -91,7 +92,7 @@ function genRef() {
 // ============================================================
 // SERVICE CARD
 // ============================================================
-function ServiceCard({ name, price, duration, openBookingModal }) {
+function ServiceCard({ name, price, duration, openBookingModal, serviceObj }) {
   return (
     <div className="service-card">
       <div className="sc-top">
@@ -100,7 +101,7 @@ function ServiceCard({ name, price, duration, openBookingModal }) {
       </div>
       <div className="sc-right">
         <span className="sc-price">€{price}</span>
-        <button className="sc-book-btn" onClick={() => openBookingModal()}>Book</button>
+        <button className="sc-book-btn" onClick={() => openBookingModal(serviceObj)}>Book</button>
       </div>
     </div>
   );
@@ -116,8 +117,19 @@ function MainSite() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [open] = useState(isOpenNow());
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [preSelectedService, setPreSelectedService] = useState(null);
+  const [dbServices, setDbServices] = useState([]);
 
-  const openBookingModal = () => setBookingModalOpen(true);
+  useEffect(() => {
+    supabase.from('services').select('id, name, duration_mins, price, category').then(({ data }) => {
+      if (data) setDbServices(data);
+    });
+  }, []);
+
+  const openBookingModal = (serviceObj = null) => {
+    setPreSelectedService(serviceObj || null);
+    setBookingModalOpen(true);
+  };
 
   const homeRef = useRef(null);
   const aboutRef = useRef(null);
@@ -483,7 +495,12 @@ function MainSite() {
           </div>
           <div className="services-grid">
             {SERVICES[activeTab].map((s) => (
-              <ServiceCard key={s.name} {...s} openBookingModal={openBookingModal} />
+              <ServiceCard
+                key={s.name}
+                {...s}
+                openBookingModal={openBookingModal}
+                serviceObj={dbServices.find(d => d.name === s.name) || null}
+              />
             ))}
           </div>
           <div className="services-cta">
@@ -606,7 +623,7 @@ function MainSite() {
         <button className="btn-gold" onClick={() => openBookingModal()}>Book an Appointment</button>
       </div>
 
-      <BookingModal isOpen={bookingModalOpen} onClose={() => setBookingModalOpen(false)} />
+      <BookingModal isOpen={bookingModalOpen} onClose={() => setBookingModalOpen(false)} preSelectedService={preSelectedService} />
       <Analytics />
       <SpeedInsights />
     </>
