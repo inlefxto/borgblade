@@ -53,6 +53,8 @@ function addDays(dateStr: string, n: number): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+const formatTime = (timeStr: string) => timeStr.substring(0, 5);
+
 function formatDuration(mins: number): string {
   if (mins < 60) return `${mins} min`;
   const h = Math.floor(mins / 60);
@@ -254,7 +256,7 @@ function BookingCard({ booking, onComplete, onCancel, updating }: BookingCardPro
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1.15rem', letterSpacing: '0.06em', color: '#F2F2F2' }}>
-          {booking.time_slot}
+          {formatTime(booking.time_slot)}
         </span>
         <span style={{
           padding: '2px 8px', fontSize: '0.63rem', letterSpacing: '0.1em',
