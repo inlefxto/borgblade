@@ -21,6 +21,38 @@ interface BookingModalProps {
   onClose: () => void;
 }
 
+const serviceDescriptions: Record<string, string> = {
+  'Haircut (Clipper)': 'Clean clipper cut styled to your preference',
+  'Skinfade Haircut': 'Seamless fade from skin to length',
+  'Scissors Classic Haircut': 'Precision scissor cut for a refined look',
+  'Long Scissors Haircut': 'Scissor cut tailored for longer hair',
+  'Haircut + Wash & Style': 'Full service including wash and finish',
+  "Boy's Haircut (0-5 yrs)": 'Gentle cut for young ones',
+  '+65 Haircut': 'Relaxed cut for senior clients',
+  'Head Shave (Clipper)': 'Smooth clipper head shave',
+  'Clean Head Shave': 'Razor clean head shave finish',
+  'Hairstyling': 'Style and finish with premium products',
+  'Beard Grooming': 'Shape and tidy your beard',
+  'Beard Clean Shave': 'Full beard removal for a clean look',
+  'Hot Towel Beard Grooming': 'Beard groom with hot towel treatment',
+  'Premium Beard Clean Shave': 'Luxury shave with hot towel and aftercare',
+  'Haircut & Skinfade': 'Haircut combined with a clean skin fade',
+  'Haircut & Beard Trim': 'Full cut and beard tidy combo',
+  'Skinfade & Beard Grooming': 'Fade and full beard grooming combo',
+  'Skin Fade & Design': 'Fade with custom hair design detail',
+  'Haircut, Eyebrows & Beard': 'Complete grooming package',
+  'Full Service (Haircut + Facial + Eyebrows)': 'Head to toe premium grooming experience',
+  'Eyebrows': 'Clean eyebrow shape and definition',
+  'Eyebrows, Ears & Nose Waxing': 'Full facial waxing package',
+  'Ears & Nose Waxing': 'Quick and clean waxing service',
+};
+
+const barberPhotos: Record<string, string> = {
+  'Marco Borg': '/Marco.png',
+  'Luca Farrugia': '/Luca.png',
+  'Dylan Camilleri': '/Dylan.png',
+};
+
 const CATEGORY_LABELS: Record<string, string> = {
   haircuts: 'Haircuts',
   beard: 'Beard Grooming',
@@ -122,7 +154,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   }, [isOpen]);
 
   useEffect(() => {
-    if (step === 3 && selectedStaff && selectedDate) {
+    if (step === 3 && selectedStaff && selectedDate && selectedService) {
       setLoading(true);
       (async () => {
         const { data: existingBookings } = await supabase
@@ -132,37 +164,37 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           .eq('booking_date', selectedDate)
           .neq('status', 'cancelled');
 
-        console.log('Raw existing bookings:', existingBookings);
-
         const bookedSlots = (existingBookings || []).map(b =>
           String(b.time_slot).substring(0, 5)
         );
 
-        console.log('Booked slots normalized:', bookedSlots);
-
         const allSlots = generateTimeSlots();
         const now = new Date();
         const isToday = selectedDate === now.toLocaleDateString('en-CA');
+        const slotDurationMins = 30;
+        const slotsNeeded = Math.ceil(selectedService.duration_mins / slotDurationMins);
 
         const availableSlots = allSlots.filter(slot => {
           if (bookedSlots.includes(slot)) return false;
           if (isToday) {
-            const [hours, minutes] = slot.split(':').map(Number);
+            const [h, m] = slot.split(':').map(Number);
             const slotTime = new Date();
-            slotTime.setHours(hours, minutes, 0, 0);
-            const bufferTime = new Date(now.getTime() + 30 * 60 * 1000);
-            return slotTime > bufferTime;
+            slotTime.setHours(h, m, 0, 0);
+            if (slotTime <= new Date(now.getTime() + 30 * 60 * 1000)) return false;
+          }
+          const slotIndex = allSlots.indexOf(slot);
+          for (let i = 1; i < slotsNeeded; i++) {
+            const nextSlot = allSlots[slotIndex + i];
+            if (!nextSlot || bookedSlots.includes(nextSlot)) return false;
           }
           return true;
         });
-
-        console.log('Available slots after filter:', availableSlots);
 
         setTimeSlots(availableSlots);
         setLoading(false);
       })();
     }
-  }, [step, selectedStaff, selectedDate]);
+  }, [step, selectedStaff, selectedDate, selectedService]);
 
   const handleConfirm = async () => {
     if (!selectedService || !selectedStaff || !selectedDate || !selectedTime || !clientName || !clientEmail) return;
@@ -170,17 +202,22 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setBookingError('');
     console.log('Inserting:', clientName, clientEmail, selectedService, selectedStaff, selectedDate, selectedTime);
     await supabase.from('bookings').select('id').limit(1);
-    const { error } = await supabase.from('bookings').insert({
+    const bookingRef = `BB-${Date.now()}`;
+    const allSlots = generateTimeSlots();
+    const slotIndex = allSlots.indexOf(selectedTime);
+    const slotsNeeded = Math.ceil(selectedService.duration_mins / 30);
+    const rows = Array.from({ length: slotsNeeded }, (_, i) => ({
       client_name: clientName,
       client_email: clientEmail,
       client_phone: clientPhone,
       service_id: selectedService.id,
       staff_id: selectedStaff.id,
       booking_date: selectedDate,
-      time_slot: selectedTime,
-      booking_ref: `BB-${Date.now()}`,
+      time_slot: allSlots[slotIndex + i],
+      booking_ref: bookingRef,
       status: 'confirmed',
-    });
+    }));
+    const { error } = await supabase.from('bookings').insert(rows);
     if (error) {
       console.error('Insert error:', JSON.stringify(error));
       setBookingError(error.message);
@@ -199,7 +236,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         barberName: selectedStaff.name,
         date: selectedDate,
         time: selectedTime,
-        bookingRef: `BB-${Date.now()}`
+        bookingRef
       })
     });
     setStep(6);
@@ -375,7 +412,10 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         >
                           <div>
                             <div style={{ color: '#F2F2F2', fontSize: '0.9rem', fontWeight: 500 }}>{svc.name}</div>
-                            <div style={{ color: '#888', fontSize: '0.75rem', marginTop: 2 }}>{formatDuration(svc.duration_mins)}</div>
+                            {serviceDescriptions[svc.name] && (
+                              <div style={{ color: '#666', fontSize: '0.72rem', marginTop: 3, fontStyle: 'italic' }}>{serviceDescriptions[svc.name]}</div>
+                            )}
+                            <div style={{ color: '#888', fontSize: '0.72rem', marginTop: 4 }}>{formatDuration(svc.duration_mins)}</div>
                           </div>
                           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1.5rem', color: '#C9A84C', flexShrink: 0, marginLeft: 16 }}>€{svc.price}</div>
                         </button>
@@ -409,31 +449,34 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         width: '100%',
                       }}
                     >
-                      {b.photo_url ? (
+                      <div style={{ position: 'relative', flexShrink: 0, width: 60, height: 60 }}>
                         <img
-                          src={b.photo_url}
+                          src={barberPhotos[b.name] || b.photo_url || ''}
                           alt={b.name}
-                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.nextSibling as HTMLElement).style.display = 'flex'; }}
-                          style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: sel ? '2px solid #C9A84C' : '2px solid #333', flexShrink: 0 }}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            (e.currentTarget.nextSibling as HTMLElement).style.display = 'flex';
+                          }}
+                          style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center top', border: sel ? '2px solid #C9A84C' : '2px solid #333', display: 'block' }}
                         />
-                      ) : null}
-                      <div
-                        style={{
-                          width: 56, height: 56, borderRadius: '50%',
-                          background: '#1e1e1e',
-                          border: sel ? '2px solid #C9A84C' : '2px solid #333',
-                          flexShrink: 0,
-                          display: b.photo_url ? 'none' : 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#C9A84C',
-                          fontSize: '1.1rem',
-                          fontWeight: 700,
-                          letterSpacing: '0.05em',
-                          fontFamily: 'DM Sans, sans-serif',
-                        }}
-                      >
-                        {b.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                        <div
+                          style={{
+                            width: 60, height: 60, borderRadius: '50%',
+                            background: '#1e1e1e',
+                            border: sel ? '2px solid #C9A84C' : '2px solid #333',
+                            position: 'absolute', top: 0, left: 0,
+                            display: 'none',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#C9A84C',
+                            fontSize: '1.1rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.05em',
+                            fontFamily: 'DM Sans, sans-serif',
+                          }}
+                        >
+                          {b.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </div>
                       </div>
                       <div>
                         <div style={{ color: '#F2F2F2', fontSize: '0.95rem', fontWeight: 600 }}>{b.name}</div>
