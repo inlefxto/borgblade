@@ -612,8 +612,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   ))}
                 </div>
               </div>
-              <p style={{ color: '#888', fontSize: '0.78rem', marginTop: 16, lineHeight: 1.6 }}>
-                By confirming you agree to our cancellation policy. A confirmation email will be sent to {clientEmail}.
+              <p style={{ color: '#888', fontSize: '12px', lineHeight: '1.6', margin: '0' }}>
+                By confirming you agree to our cancellation policy: free cancellation up to 24 hours before your appointment. Cancellations within 24 hours must be made via your confirmation email or by phone.
               </p>
             </div>
           )}
