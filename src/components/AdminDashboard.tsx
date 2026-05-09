@@ -268,6 +268,9 @@ function BookingCard({ booking, onComplete, onCancel, updating }: BookingCardPro
         {booking.client_phone && (
           <div style={{ fontSize: '0.74rem', color: '#777', marginTop: 2 }}>{booking.client_phone}</div>
         )}
+        {booking.client_email && (
+          <div style={{ fontSize: '0.74rem', color: '#777', marginTop: 2 }}>{booking.client_email}</div>
+        )}
       </div>
 
       {booking.services && (
