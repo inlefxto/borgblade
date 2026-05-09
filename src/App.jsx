@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import BookingModal from './components/BookingModal';
 import AdminDashboard from './components/AdminDashboard';
+import CancelPage from './components/CancelPage';
 
 // ============================================================
 // DATA
@@ -618,6 +619,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<MainSite />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/cancel" element={<CancelPage />} />
       </Routes>
     </BrowserRouter>
   );
