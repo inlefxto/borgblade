@@ -233,6 +233,9 @@ export default function CancelPage() {
                   {cancelling ? 'Cancelling...' : 'Confirm'}
                 </button>
               </div>
+              <p style={{ color: '#888', fontSize: '12px', lineHeight: '1.6', margin: '16px 0 0' }}>
+                By confirming you agree to our cancellation policy: free cancellation up to 24 hours before your appointment. Cancellations within 24 hours must be made via your confirmation email or by phone.
+              </p>
             </div>
           )}
 
