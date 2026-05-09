@@ -280,13 +280,12 @@ function MainSite() {
 
         .service-card { background: var(--surface); padding: 24px 28px; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; gap: 16px; }
         .service-card:hover { background: var(--surface2); }
-        .service-card:hover .sc-book-btn { opacity: 1; transform: translateX(0); }
         .sc-top { display: flex; flex-direction: column; gap: 6px; flex: 1; }
         .sc-name { font-size: 0.9rem; font-weight: 500; color: var(--white); }
         .sc-dur { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.05em; }
         .sc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
         .sc-price { font-family: var(--font-display); font-size: 1.6rem; color: var(--gold); line-height: 1; white-space: nowrap; }
-        .sc-book-btn { background: none; border: 1px solid var(--gold); color: var(--gold); padding: 5px 12px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; white-space: nowrap; opacity: 0; transform: translateX(6px); transition: opacity 0.2s, transform 0.2s, background 0.2s, color 0.2s; }
+        .sc-book-btn { background: none; border: 1px solid var(--gold); color: var(--gold); padding: 5px 12px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; white-space: nowrap; transition: background 0.2s, color 0.2s; }
         .sc-book-btn:hover { background: var(--gold); color: var(--black); }
         .services-cta { text-align: center; margin-top: 56px; }
         .services-cta p { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
