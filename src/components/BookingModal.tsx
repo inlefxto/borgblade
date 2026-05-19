@@ -121,6 +121,7 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
 
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState('');
 
@@ -150,11 +151,14 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
 
   useEffect(() => {
     if (isOpen) {
-      supabase.from('services').select('id, name, duration_mins, price, category').order('category').then(({ data }) => {
-        if (data) setServices(data);
-      });
-      supabase.from('staff').select('*').then(({ data }) => {
-        if (data) setStaff(data);
+      setLoadingData(true);
+      Promise.all([
+        supabase.from('services').select('id, name, duration_mins, price, category').order('category'),
+        supabase.from('staff').select('*'),
+      ]).then(([{ data: svcData }, { data: staffData }]) => {
+        if (svcData) setServices(svcData);
+        if (staffData) setStaff(staffData);
+        setLoadingData(false);
       });
     }
   }, [isOpen]);
@@ -332,6 +336,19 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
     (step === 3 && !!selectedDate && !!selectedTime) ||
     (step === 4 && clientName.trim().length > 1 && /\S+@\S+\.\S+/.test(clientEmail));
 
+  const Spinner = () => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+      <span style={{
+        width: 28, height: 28,
+        border: '2px solid #2a2a2a',
+        borderTopColor: '#C9A84C',
+        borderRadius: '50%',
+        display: 'inline-block',
+        animation: 'spin 0.75s linear infinite',
+      }} />
+    </div>
+  );
+
   return (
     <>
     <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -395,7 +412,7 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
           {step === 1 && (
             <div>
               <p style={{ fontSize: '0.75rem', color: '#888', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 20 }}>Choose a Service</p>
-              {CATEGORY_ORDER.filter((c) => grouped[c]).map((cat) => (
+              {loadingData ? <Spinner /> : CATEGORY_ORDER.filter((c) => grouped[c]).map((cat) => (
                 <div key={cat} style={{ marginBottom: 24 }}>
                   <p style={{ fontSize: '0.68rem', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 10 }}>{CATEGORY_LABELS[cat]}</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -437,7 +454,7 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
           {step === 2 && (
             <div>
               <p style={{ fontSize: '0.75rem', color: '#888', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 20 }}>Choose a Barber</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {loadingData ? <Spinner /> : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {staff.map((b) => {
                   const sel = selectedStaff?.id === b.id;
                   return (
@@ -492,7 +509,7 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
                     </button>
                   );
                 })}
-              </div>
+              </div>}
             </div>
           )}
 
@@ -509,7 +526,7 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
                     {formatDisplayDate(selectedDate)}
                   </p>
                   {loading ? (
-                    <p style={{ color: '#888', fontSize: '0.85rem' }}>Loading available slots...</p>
+                    <Spinner />
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
                       {timeSlots.map((slot) => {
@@ -689,7 +706,7 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
                   {submitting && (
                     <span style={{ width: 14, height: 14, border: '2px solid #888', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
                   )}
-                  {submitting ? 'Confirming...' : 'Confirm Booking'}
+                  {submitting ? 'Processing...' : 'Confirm Booking'}
                 </button>
               </div>
             )}

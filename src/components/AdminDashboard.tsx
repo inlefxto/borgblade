@@ -11,7 +11,7 @@ interface Booking {
   status: string;
   staff_id: string;
   service_id: string;
-  services: { name: string; duration_mins: number } | null;
+  services: { name: string; duration_mins: number; price: number } | null;
   staff: { name: string } | null;
 }
 
@@ -236,9 +236,10 @@ interface BookingCardProps {
   onComplete: (id: string) => void;
   onCancel: (id: string) => void;
   updating: string | null;
+  showCompleted: boolean;
 }
 
-function BookingCard({ booking, onComplete, onCancel, updating }: BookingCardProps) {
+function BookingCard({ booking, onComplete, onCancel, updating, showCompleted }: BookingCardProps) {
   const isUpdating = updating === booking.id;
   const statusStyles: Record<string, { bg: string; border: string; text: string }> = {
     confirmed: { bg: 'rgba(201,168,76,0.08)', border: '#C9A84C33', text: '#C9A84C' },
@@ -282,36 +283,46 @@ function BookingCard({ booking, onComplete, onCancel, updating }: BookingCardPro
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 6 }}>
-        {booking.status !== 'completed' && (
-          <button
-            onClick={() => onComplete(booking.id)}
-            disabled={isUpdating}
-            style={{
-              flex: 1, padding: '6px 0', background: 'none', border: '1px solid #4ade8022',
-              color: '#4ade80', fontSize: '0.68rem', letterSpacing: '0.08em',
-              cursor: isUpdating ? 'not-allowed' : 'pointer',
-              fontFamily: 'DM Sans, sans-serif', opacity: isUpdating ? 0.4 : 1,
-            }}
-            onMouseEnter={e => { if (!isUpdating) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(74,222,128,0.08)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
-          >Complete</button>
-        )}
-        {booking.status !== 'cancelled' && (
-          <button
-            onClick={() => onCancel(booking.id)}
-            disabled={isUpdating}
-            style={{
-              flex: 1, padding: '6px 0', background: 'none', border: '1px solid #f8717122',
-              color: '#f87171', fontSize: '0.68rem', letterSpacing: '0.08em',
-              cursor: isUpdating ? 'not-allowed' : 'pointer',
-              fontFamily: 'DM Sans, sans-serif', opacity: isUpdating ? 0.4 : 1,
-            }}
-            onMouseEnter={e => { if (!isUpdating) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.08)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
-          >Cancel</button>
-        )}
-      </div>
+      {booking.status === 'completed' && showCompleted ? (
+        <div style={{
+          padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: 5,
+          background: 'rgba(74,222,128,0.08)', border: '1px solid #4ade8033',
+          fontSize: '0.65rem', color: '#4ade80', letterSpacing: '0.1em', textTransform: 'uppercase',
+        }}>
+          <span style={{ fontSize: '0.7rem' }}>&#10003;</span> Completed
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 6 }}>
+          {booking.status !== 'completed' && (
+            <button
+              onClick={() => onComplete(booking.id)}
+              disabled={isUpdating}
+              style={{
+                flex: 1, padding: '6px 0', background: 'none', border: '1px solid #4ade8022',
+                color: '#4ade80', fontSize: '0.68rem', letterSpacing: '0.08em',
+                cursor: isUpdating ? 'not-allowed' : 'pointer',
+                fontFamily: 'DM Sans, sans-serif', opacity: isUpdating ? 0.4 : 1,
+              }}
+              onMouseEnter={e => { if (!isUpdating) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(74,222,128,0.08)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
+            >Complete</button>
+          )}
+          {booking.status !== 'cancelled' && (
+            <button
+              onClick={() => onCancel(booking.id)}
+              disabled={isUpdating}
+              style={{
+                flex: 1, padding: '6px 0', background: 'none', border: '1px solid #f8717122',
+                color: '#f87171', fontSize: '0.68rem', letterSpacing: '0.08em',
+                cursor: isUpdating ? 'not-allowed' : 'pointer',
+                fontFamily: 'DM Sans, sans-serif', opacity: isUpdating ? 0.4 : 1,
+              }}
+              onMouseEnter={e => { if (!isUpdating) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.08)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
+            >Cancel</button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -329,6 +340,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
   const [addModal, setAddModal] = useState<{ barberId: string; barberName: string } | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -350,7 +362,7 @@ export default function AdminDashboard() {
     setLoading(true);
     const { data } = await supabase
       .from('bookings')
-      .select('*, services(name, duration_mins), staff(name)')
+      .select('*, services(name, duration_mins, price), staff(name)')
       .eq('booking_date', selectedDate)
       .neq('status', 'cancelled')
       .order('time_slot');
@@ -440,8 +452,18 @@ export default function AdminDashboard() {
 
   // ── Dashboard ─────────────────────────────────────────────────────────────
 
+  const confirmedRevenue = bookings
+    .filter(b => b.status === 'confirmed')
+    .reduce((sum, b) => sum + (b.services?.price ?? 0), 0);
+
+  const completedRevenue = bookings
+    .filter(b => b.status === 'completed')
+    .reduce((sum, b) => sum + (b.services?.price ?? 0), 0);
+
   const byBarber = BARBERS.reduce<Record<string, Booking[]>>((acc, b) => {
-    acc[b.id] = bookings.filter(bk => bk.staff_id === b.id);
+    acc[b.id] = bookings.filter(bk =>
+      bk.staff_id === b.id && (showCompleted ? true : bk.status !== 'completed')
+    );
     return acc;
   }, {});
 
@@ -496,6 +518,22 @@ export default function AdminDashboard() {
             <span style={{ color: '#444', fontSize: '0.72rem', marginRight: 4 }}>
               {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
             </span>
+            {(confirmedRevenue > 0 || completedRevenue > 0) && (
+              <span style={{ color: '#C9A84C', fontSize: '0.7rem', letterSpacing: '0.05em', marginRight: 4, whiteSpace: 'nowrap' }}>
+                €{confirmedRevenue} confirmed · €{completedRevenue} completed
+              </span>
+            )}
+            <button
+              onClick={() => setShowCompleted(v => !v)}
+              style={{
+                background: showCompleted ? 'rgba(74,222,128,0.1)' : 'none',
+                border: showCompleted ? '1px solid #4ade8033' : '1px solid #1e1e1e',
+                color: showCompleted ? '#4ade80' : '#555',
+                padding: '5px 14px', cursor: 'pointer', fontSize: '0.7rem',
+                letterSpacing: '0.08em', fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
+                whiteSpace: 'nowrap',
+              }}
+            >Show Completed</button>
             <button
               onClick={fetchBookings}
               style={{ background: 'none', border: '1px solid #1e1e1e', color: '#555', padding: '5px 14px', cursor: 'pointer', fontSize: '0.7rem', letterSpacing: '0.08em', fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s' }}
@@ -600,6 +638,7 @@ export default function AdminDashboard() {
                           onComplete={id => updateStatus(id, 'completed')}
                           onCancel={id => updateStatus(id, 'cancelled')}
                           updating={updating}
+                          showCompleted={showCompleted}
                         />
                       ))
                     )}
