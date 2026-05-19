@@ -124,6 +124,7 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
   const [loadingData, setLoadingData] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState('');
+  const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string }>({});
 
   useEffect(() => {
     if (!isOpen) return;
@@ -135,6 +136,7 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
     setClientEmail('');
     setClientPhone('');
     setBookingError('');
+    setErrors({});
     if (preSelectedService) {
       setSelectedService(preSelectedService);
       setStep(2);
@@ -325,16 +327,26 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
     );
   };
 
+  const validateDetails = () => {
+    const newErrors: { name?: string; email?: string; phone?: string } = {};
+    if (!clientName.trim()) newErrors.name = 'Please enter your full name';
+    if (!clientEmail.trim()) newErrors.email = 'Please enter your email address';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) newErrors.email = 'Please enter a valid email address (e.g. name@example.com)';
+    if (!clientPhone.trim()) newErrors.phone = 'Please enter your phone number';
+    else if (clientPhone.replace(/\D/g, '').length < 8) newErrors.phone = 'Please enter a valid phone number';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   if (!isOpen) return null;
 
   const stepLabels = ['Service', 'Barber', 'Date & Time', 'Details', 'Confirm'];
-
 
   const canNext =
     (step === 1 && !!selectedService) ||
     (step === 2 && !!selectedStaff) ||
     (step === 3 && !!selectedDate && !!selectedTime) ||
-    (step === 4 && clientName.trim().length > 1 && /\S+@\S+\.\S+/.test(clientEmail));
+    step === 4;
 
   const Spinner = () => (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
@@ -567,30 +579,32 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
                   <input
                     type="text"
                     value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
+                    onChange={(e) => { setClientName(e.target.value); if (errors.name) setErrors(prev => ({ ...prev, name: undefined })); }}
                     placeholder="Your name"
                     style={{
                       width: '100%', padding: '12px 16px',
-                      background: '#181818', border: '1px solid #333',
+                      background: '#181818', border: `1px solid ${errors.name ? '#f87171' : '#333'}`,
                       color: '#F2F2F2', fontSize: '0.95rem',
                       outline: 'none', fontFamily: 'DM Sans, sans-serif',
                     }}
                   />
+                  {errors.name && <p style={{ color: '#f87171', fontSize: '12px', marginTop: 6, fontFamily: 'DM Sans, sans-serif' }}>{errors.name}</p>}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.7rem', color: '#C9A84C', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Email Address</label>
                   <input
                     type="email"
                     value={clientEmail}
-                    onChange={(e) => setClientEmail(e.target.value)}
+                    onChange={(e) => { setClientEmail(e.target.value); if (errors.email) setErrors(prev => ({ ...prev, email: undefined })); }}
                     placeholder="your@email.com"
                     style={{
                       width: '100%', padding: '12px 16px',
-                      background: '#181818', border: '1px solid #333',
+                      background: '#181818', border: `1px solid ${errors.email ? '#f87171' : '#333'}`,
                       color: '#F2F2F2', fontSize: '0.95rem',
                       outline: 'none', fontFamily: 'DM Sans, sans-serif',
                     }}
                   />
+                  {errors.email && <p style={{ color: '#f87171', fontSize: '12px', marginTop: 6, fontFamily: 'DM Sans, sans-serif' }}>{errors.email}</p>}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.7rem', color: '#C9A84C', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Phone Number</label>
@@ -598,14 +612,15 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
                     type="tel"
                     placeholder="Phone Number"
                     value={clientPhone}
-                    onChange={(e) => setClientPhone(e.target.value)}
+                    onChange={(e) => { setClientPhone(e.target.value); if (errors.phone) setErrors(prev => ({ ...prev, phone: undefined })); }}
                     style={{
                       width: '100%', padding: '12px 16px',
-                      background: '#181818', border: '1px solid #333',
+                      background: '#181818', border: `1px solid ${errors.phone ? '#f87171' : '#333'}`,
                       color: '#F2F2F2', fontSize: '0.95rem',
                       outline: 'none', fontFamily: 'DM Sans, sans-serif',
                     }}
                   />
+                  {errors.phone && <p style={{ color: '#f87171', fontSize: '12px', marginTop: 6, fontFamily: 'DM Sans, sans-serif' }}>{errors.phone}</p>}
                 </div>
               </div>
             </div>
@@ -689,7 +704,11 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
             ) : <div />}
             {step < 5 ? (
               <button
-                onClick={() => canNext && setStep((s) => s + 1)}
+                onClick={() => {
+                  if (!canNext) return;
+                  if (step === 4 && !validateDetails()) return;
+                  setStep((s) => s + 1);
+                }}
                 disabled={!canNext}
                 style={{ background: canNext ? '#C9A84C' : '#1e1e1e', border: 'none', color: canNext ? '#0A0A0A' : '#444', padding: '12px 32px', cursor: canNext ? 'pointer' : 'default', fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '0.08em', transition: 'background 0.2s' }}
               >Continue</button>
