@@ -76,7 +76,7 @@ const TIMES = [
 
 
 
-const HOURS = { open: 9, close: 19, days: [2, 3, 4, 5, 6] };
+const HOURS = { open: 9, close: 18, days: [2, 3, 4, 5, 6] };
 
 function isOpenNow() {
   const now = new Date();
@@ -401,7 +401,7 @@ function MainSite() {
             <div className="hero-cta">
               <button className="btn-gold" onClick={() => openBookingModal()}>Book an Appointment</button>
             </div>
-            <p className="hero-location">Tue – Sat &nbsp;·&nbsp; 09:00 – 19:00</p>
+            <p className="hero-location">Tue – Sat &nbsp;·&nbsp; 09:00 – 18:00</p>
           </div>
           <div className="hero-scroll"><div className="scroll-line" /><span>Scroll</span></div>
         </div>
@@ -549,7 +549,7 @@ function MainSite() {
               </div>
               <div className="findus-item">
                 <span className="findus-item-label">Opening Hours</span>
-                <span className="findus-item-value">Tue – Sat<br />09:00 – 19:00</span>
+                <span className="findus-item-value">Tue – Sat<br />09:00 – 18:00</span>
               </div>
             </div>
             <div className="findus-map-wrap">
@@ -606,7 +606,7 @@ function MainSite() {
                 <strong>+356 2134 5678</strong><br />
                 hello@borgblade.mt<br /><br />
                 <strong>Tue - Sat</strong><br />
-                09:00 - 19:00
+                09:00 - 18:00
               </p>
             </div>
           </div>
