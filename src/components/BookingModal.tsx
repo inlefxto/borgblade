@@ -236,7 +236,7 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
       setSubmitting(false);
       throw error;
     }
-    await fetch('/api/send-confirmation', {
+    const emailRes = await fetch('/api/send-confirmation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -248,9 +248,16 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
         barberName: selectedStaff.name,
         date: selectedDate,
         time: selectedTime,
-        bookingRef
-      })
+        bookingRef,
+      }),
     });
+    const emailData = await emailRes.json();
+    if (emailData.reminderEmailId) {
+      await supabase
+        .from('bookings')
+        .update({ reminder_email_id: emailData.reminderEmailId })
+        .eq('booking_ref', bookingRef);
+    }
     setStep(6);
     setSubmitting(false);
   };
