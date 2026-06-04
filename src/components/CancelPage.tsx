@@ -9,6 +9,7 @@ interface Booking {
   time_slot: string;
   status: string;
   client_name: string;
+  reminder_email_id: string | null;
   services: { name: string } | null;
   staff: { name: string } | null;
 }
@@ -46,7 +47,7 @@ export default function CancelPage() {
     (async () => {
       const { data } = await supabase
         .from('bookings')
-        .select('*, services(name), staff(name)')
+        .select('*, services(name), staff(name), reminder_email_id')
         .eq('booking_ref', bookingRef)
         .maybeSingle();
 
@@ -75,15 +76,27 @@ export default function CancelPage() {
     if (!bookingRef) return;
     setCancelling(true);
     setCancelError('');
+
+    // Cancel the scheduled reminder email if one exists
+    if (booking?.reminder_email_id) {
+      await fetch('/api/cancel-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reminderEmailId: booking.reminder_email_id }),
+      });
+    }
+
     const { error } = await supabase
       .from('bookings')
       .update({ status: 'cancelled' })
       .eq('booking_ref', bookingRef);
+
     if (error) {
       setCancelError('Something went wrong. Please try again.');
       setCancelling(false);
       return;
     }
+
     setState('cancelled');
     setCancelling(false);
   };
