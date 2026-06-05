@@ -22,6 +22,14 @@ interface Service {
   duration_mins: number;
 }
 
+interface BusinessHours {
+  id: number;
+  day_of_week: number;
+  open_time: string | null;
+  close_time: string | null;
+  is_closed: boolean;
+}
+
 const BARBERS = [
   { id: 'ce5de67b-1424-4d20-85c9-328cdba2f434', name: 'Marco Borg' },
   { id: '68e0e021-ed78-4845-b209-a698863fe365', name: 'Luca Farrugia' },
@@ -341,6 +349,10 @@ export default function AdminDashboard() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [addModal, setAddModal] = useState<{ barberId: string; barberName: string } | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [activeView, setActiveView] = useState<'bookings' | 'settings'>('bookings');
+  const [businessHours, setBusinessHours] = useState<BusinessHours[]>([]);
+  const [savingDay, setSavingDay] = useState<number | null>(null);
+  const [hoursSaved, setHoursSaved] = useState<number | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -379,12 +391,21 @@ export default function AdminDashboard() {
     if (data) setServices(data as Service[]);
   }, []);
 
+  const fetchBusinessHours = useCallback(async () => {
+    const { data } = await supabase
+      .from('business_hours')
+      .select('*')
+      .order('day_of_week');
+    if (data) setBusinessHours(data as BusinessHours[]);
+  }, []);
+
   useEffect(() => {
     if (authed) {
       fetchBookings();
       fetchServices();
+      fetchBusinessHours();
     }
-  }, [authed, fetchBookings, fetchServices]);
+  }, [authed, fetchBookings, fetchServices, fetchBusinessHours]);
 
   // ── Login screen ──────────────────────────────────────────────────────────
 
