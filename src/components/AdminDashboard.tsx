@@ -493,6 +493,29 @@ export default function AdminDashboard() {
     return acc;
   }, {});
 
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  const saveBusinessHours = async (row: BusinessHours) => {
+    setSavingDay(row.day_of_week);
+    await supabase
+      .from('business_hours')
+      .update({
+        is_closed: row.is_closed,
+        open_time: row.open_time,
+        close_time: row.close_time,
+      })
+      .eq('id', row.id);
+    setSavingDay(null);
+    setHoursSaved(row.day_of_week);
+    setTimeout(() => setHoursSaved(null), 2000);
+  };
+
+  const updateHoursLocal = (dayOfWeek: number, field: keyof BusinessHours, value: unknown) => {
+    setBusinessHours(prev => prev.map(h =>
+      h.day_of_week === dayOfWeek ? { ...h, [field]: value } : h
+    ));
+  };
+
   const updateStatus = async (id: string, status: string) => {
     setUpdating(id);
     await supabase.from('bookings').update({ status }).eq('id', id);
@@ -556,6 +579,17 @@ export default function AdminDashboard() {
               }}
             >Show Completed</button>
             <button
+              onClick={() => setActiveView(v => v === 'settings' ? 'bookings' : 'settings')}
+              style={{
+                background: activeView === 'settings' ? 'rgba(201,168,76,0.1)' : 'none',
+                border: activeView === 'settings' ? '1px solid #C9A84C55' : '1px solid #1e1e1e',
+                color: activeView === 'settings' ? '#C9A84C' : '#555',
+                padding: '5px 14px', cursor: 'pointer', fontSize: '0.7rem',
+                letterSpacing: '0.08em', fontFamily: 'DM Sans, sans-serif',
+                transition: 'all 0.15s', whiteSpace: 'nowrap',
+              }}
+            >Settings</button>
+            <button
               onClick={fetchBookings}
               style={{ background: 'none', border: '1px solid #1e1e1e', color: '#555', padding: '5px 14px', cursor: 'pointer', fontSize: '0.7rem', letterSpacing: '0.08em', fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.color = '#F2F2F2'; e.currentTarget.style.borderColor = '#444'; }}
@@ -605,89 +639,183 @@ export default function AdminDashboard() {
         >&#8250;</button>
       </div>
 
-      {/* Three-column layout */}
-      <div className="admin-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '20px 32px' }}>
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '80px 0', color: '#333', fontSize: '0.82rem', letterSpacing: '0.12em' }}>
-            Loading...
-          </div>
-        ) : (
-          <div className="admin-cols" style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-            {BARBERS.map(barber => {
-              const barberBookings = byBarber[barber.id] || [];
-              return (
-                <div
-                  key={barber.id}
-                  className="admin-col"
-                  style={{ flex: 1, minWidth: 0, background: '#0c0c0c', border: '1px solid #181818' }}
-                >
-                  {/* Column header */}
-                  <div style={{
-                    padding: '15px 16px', borderBottom: '1px solid #181818',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  }}>
-                    <div>
-                      <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '0.1em', color: '#F2F2F2' }}>
-                        {barber.name}
-                      </div>
-                      <div style={{ fontSize: '0.66rem', color: '#444', marginTop: 2 }}>
-                        {barberBookings.length} booking{barberBookings.length !== 1 ? 's' : ''}
-                      </div>
-                    </div>
+      {activeView === 'settings' ? (
+        /* Settings view */
+        <div className="admin-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '20px 32px' }}>
+          <div style={{ background: '#0c0c0c', border: '1px solid #181818', marginBottom: 20 }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #181818' }}>
+              <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '0.1em', color: '#F2F2F2' }}>
+                Business Hours
+              </div>
+              <div style={{ fontSize: '0.68rem', color: '#444', marginTop: 2 }}>
+                Set your regular opening hours for each day of the week
+              </div>
+            </div>
+            <div style={{ padding: '12px 20px' }}>
+              {businessHours.map(row => {
+                const isSaving = savingDay === row.day_of_week;
+                const isSaved  = hoursSaved === row.day_of_week;
+                return (
+                  <div
+                    key={row.day_of_week}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 16,
+                      padding: '12px 0', borderBottom: '1px solid #161616',
+                      flexWrap: 'wrap',
+                    }}
+                  >
                     <div style={{
-                      width: 26, height: 26, borderRadius: '50%', background: barberBookings.length > 0 ? '#C9A84C' : '#1e1e1e',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: 'Bebas Neue, sans-serif', fontSize: '0.85rem',
-                      color: barberBookings.length > 0 ? '#0A0A0A' : '#444',
-                      transition: 'all 0.2s',
+                      fontFamily: 'Bebas Neue, sans-serif', fontSize: '0.95rem',
+                      letterSpacing: '0.08em', color: row.is_closed ? '#333' : '#F2F2F2',
+                      width: 100, flexShrink: 0, transition: 'color 0.2s',
                     }}>
-                      {barberBookings.length}
+                      {DAY_NAMES[row.day_of_week]}
                     </div>
-                  </div>
-
-                  {/* Cards */}
-                  <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {barberBookings.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '36px 16px', color: '#2a2a2a', fontSize: '0.78rem', letterSpacing: '0.05em' }}>
-                        No bookings for this day
-                      </div>
-                    ) : (
-                      barberBookings.map(booking => (
-                        <BookingCard
-                          key={booking.id}
-                          booking={booking}
-                          onComplete={id => updateStatus(id, 'completed')}
-                          onCancel={id => updateStatus(id, 'cancelled')}
-                          updating={updating}
-                          showCompleted={showCompleted}
-                        />
-                      ))
-                    )}
-                  </div>
-
-                  {/* Add booking button */}
-                  <div style={{ padding: '10px', borderTop: '1px solid #161616' }}>
                     <button
-                      onClick={() => setAddModal({ barberId: barber.id, barberName: barber.name })}
+                      onClick={() => updateHoursLocal(row.day_of_week, 'is_closed', !row.is_closed)}
                       style={{
-                        width: '100%', padding: '9px', background: 'none',
-                        border: '1px dashed #222', color: '#444',
-                        fontSize: '0.72rem', letterSpacing: '0.1em', cursor: 'pointer',
-                        fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        padding: '5px 14px', cursor: 'pointer', fontSize: '0.68rem',
+                        letterSpacing: '0.08em', fontFamily: 'DM Sans, sans-serif',
+                        transition: 'all 0.15s', flexShrink: 0,
+                        background: row.is_closed ? 'rgba(248,113,113,0.08)' : 'rgba(74,222,128,0.08)',
+                        border: row.is_closed ? '1px solid #f8717133' : '1px solid #4ade8033',
+                        color: row.is_closed ? '#f87171' : '#4ade80',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#C9A84C55'; e.currentTarget.style.color = '#C9A84C'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.color = '#444'; }}
                     >
-                      <span style={{ fontSize: '0.95rem', lineHeight: 1 }}>+</span> Add Booking
+                      {row.is_closed ? 'Closed' : 'Open'}
+                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                      <input
+                        type="time"
+                        value={row.open_time?.substring(0, 5) ?? '09:00'}
+                        disabled={row.is_closed}
+                        onChange={e => updateHoursLocal(row.day_of_week, 'open_time', e.target.value)}
+                        style={{
+                          background: '#181818', border: '1px solid #2a2a2a',
+                          color: row.is_closed ? '#333' : '#F2F2F2',
+                          padding: '6px 10px', fontSize: '0.82rem',
+                          fontFamily: 'DM Sans, sans-serif', outline: 'none',
+                          opacity: row.is_closed ? 0.4 : 1,
+                          colorScheme: 'dark',
+                        }}
+                      />
+                      <span style={{ color: '#444', fontSize: '0.8rem' }}>to</span>
+                      <input
+                        type="time"
+                        value={row.close_time?.substring(0, 5) ?? '18:00'}
+                        disabled={row.is_closed}
+                        onChange={e => updateHoursLocal(row.day_of_week, 'close_time', e.target.value)}
+                        style={{
+                          background: '#181818', border: '1px solid #2a2a2a',
+                          color: row.is_closed ? '#333' : '#F2F2F2',
+                          padding: '6px 10px', fontSize: '0.82rem',
+                          fontFamily: 'DM Sans, sans-serif', outline: 'none',
+                          opacity: row.is_closed ? 0.4 : 1,
+                          colorScheme: 'dark',
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => saveBusinessHours(row)}
+                      disabled={isSaving}
+                      style={{
+                        padding: '6px 18px', cursor: isSaving ? 'not-allowed' : 'pointer',
+                        fontSize: '0.68rem', letterSpacing: '0.08em',
+                        fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
+                        background: isSaved ? 'rgba(74,222,128,0.08)' : 'none',
+                        border: isSaved ? '1px solid #4ade8033' : '1px solid #2a2a2a',
+                        color: isSaved ? '#4ade80' : '#777',
+                        opacity: isSaving ? 0.5 : 1, flexShrink: 0,
+                      }}
+                    >
+                      {isSaving ? 'Saving...' : isSaved ? 'Saved \u2713' : 'Save'}
                     </button>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        /* Bookings view */
+        <div className="admin-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '20px 32px' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '80px 0', color: '#333', fontSize: '0.82rem', letterSpacing: '0.12em' }}>
+              Loading...
+            </div>
+          ) : (
+            <div className="admin-cols" style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              {BARBERS.map(barber => {
+                const barberBookings = byBarber[barber.id] || [];
+                return (
+                  <div
+                    key={barber.id}
+                    className="admin-col"
+                    style={{ flex: 1, minWidth: 0, background: '#0c0c0c', border: '1px solid #181818' }}
+                  >
+                    <div style={{
+                      padding: '15px 16px', borderBottom: '1px solid #181818',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}>
+                      <div>
+                        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '0.1em', color: '#F2F2F2' }}>
+                          {barber.name}
+                        </div>
+                        <div style={{ fontSize: '0.66rem', color: '#444', marginTop: 2 }}>
+                          {barberBookings.length} booking{barberBookings.length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      <div style={{
+                        width: 26, height: 26, borderRadius: '50%', background: barberBookings.length > 0 ? '#C9A84C' : '#1e1e1e',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontFamily: 'Bebas Neue, sans-serif', fontSize: '0.85rem',
+                        color: barberBookings.length > 0 ? '#0A0A0A' : '#444',
+                        transition: 'all 0.2s',
+                      }}>
+                        {barberBookings.length}
+                      </div>
+                    </div>
+                    <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {barberBookings.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '36px 16px', color: '#2a2a2a', fontSize: '0.78rem', letterSpacing: '0.05em' }}>
+                          No bookings for this day
+                        </div>
+                      ) : (
+                        barberBookings.map(booking => (
+                          <BookingCard
+                            key={booking.id}
+                            booking={booking}
+                            onComplete={id => updateStatus(id, 'completed')}
+                            onCancel={id => updateStatus(id, 'cancelled')}
+                            updating={updating}
+                            showCompleted={showCompleted}
+                          />
+                        ))
+                      )}
+                    </div>
+                    <div style={{ padding: '10px', borderTop: '1px solid #161616' }}>
+                      <button
+                        onClick={() => setAddModal({ barberId: barber.id, barberName: barber.name })}
+                        style={{
+                          width: '100%', padding: '9px', background: 'none',
+                          border: '1px dashed #222', color: '#444',
+                          fontSize: '0.72rem', letterSpacing: '0.1em', cursor: 'pointer',
+                          fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#C9A84C55'; e.currentTarget.style.color = '#C9A84C'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.color = '#444'; }}
+                      >
+                        <span style={{ fontSize: '0.95rem', lineHeight: 1 }}>+</span> Add Booking
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add booking modal */}
       {addModal && (
