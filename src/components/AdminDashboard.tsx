@@ -20,6 +20,7 @@ interface Service {
   name: string;
   category: string;
   duration_mins: number;
+  price: number;
 }
 
 interface BusinessHours {
@@ -396,6 +397,14 @@ export default function AdminDashboard() {
   const [blockReason, setBlockReason] = useState('');
   const [addingBlock, setAddingBlock] = useState(false);
   const [deletingBlockGroup, setDeletingBlockGroup] = useState<string | null>(null);
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
+  const [editingService, setEditingService] = useState<Partial<Service>>({});
+  const [addingService, setAddingService] = useState(false);
+  const [newService, setNewService] = useState({
+    name: '', category: 'haircuts', duration_mins: 30, price: 0,
+  });
+  const [savingService, setSavingService] = useState(false);
+  const [deletingServiceId, setDeletingServiceId] = useState<string | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -428,7 +437,7 @@ export default function AdminDashboard() {
   const fetchServices = useCallback(async () => {
     const { data } = await supabase
       .from('services')
-      .select('id, name, category, duration_mins')
+      .select('id, name, category, duration_mins, price')
       .order('category')
       .order('name');
     if (data) setServices(data as Service[]);
@@ -704,6 +713,65 @@ export default function AdminDashboard() {
     await query;
     await fetchBlockedSlots();
     setDeletingBlockGroup(null);
+  };
+
+  const CATEGORIES = ['haircuts', 'beard', 'combos', 'extras'];
+  const CATEGORY_LABELS: Record<string, string> = {
+    haircuts: 'Haircuts',
+    beard: 'Beard Grooming',
+    combos: 'Combos',
+    extras: 'Extras',
+  };
+
+  const startEditService = (service: Service) => {
+    setEditingServiceId(service.id);
+    setEditingService({ ...service });
+  };
+
+  const cancelEditService = () => {
+    setEditingServiceId(null);
+    setEditingService({});
+  };
+
+  const saveEditService = async () => {
+    if (!editingServiceId || !editingService.name) return;
+    setSavingService(true);
+    await supabase
+      .from('services')
+      .update({
+        name: editingService.name,
+        category: editingService.category,
+        duration_mins: Number(editingService.duration_mins),
+        price: Number(editingService.price),
+      })
+      .eq('id', editingServiceId);
+    await fetchServices();
+    setEditingServiceId(null);
+    setEditingService({});
+    setSavingService(false);
+  };
+
+  const deleteService = async (id: string) => {
+    if (!window.confirm('Remove this service? This cannot be undone.')) return;
+    setDeletingServiceId(id);
+    await supabase.from('services').delete().eq('id', id);
+    setServices(prev => prev.filter(s => s.id !== id));
+    setDeletingServiceId(null);
+  };
+
+  const saveNewService = async () => {
+    if (!newService.name.trim()) return;
+    setSavingService(true);
+    await supabase.from('services').insert({
+      name: newService.name.trim(),
+      category: newService.category,
+      duration_mins: Number(newService.duration_mins),
+      price: Number(newService.price),
+    });
+    await fetchServices();
+    setNewService({ name: '', category: 'haircuts', duration_mins: 30, price: 0 });
+    setAddingService(false);
+    setSavingService(false);
   };
 
   function formatClosedDate(dateStr: string): string {
@@ -1423,6 +1491,292 @@ export default function AdminDashboard() {
                   </div>
                 );
               })()}
+            </div>
+          </div>
+
+          {/* Services Management Panel */}
+          <div style={{ background: '#0c0c0c', border: '1px solid #181818', marginBottom: 20 }}>
+            <div style={{
+              padding: '16px 20px', borderBottom: '1px solid #181818',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div>
+                <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '0.1em', color: '#F2F2F2' }}>
+                  Services Management
+                </div>
+                <div style={{ fontSize: '0.68rem', color: '#444', marginTop: 2 }}>
+                  Add, edit or remove services and their prices
+                </div>
+              </div>
+              <button
+                onClick={() => { setAddingService(v => !v); setEditingServiceId(null); }}
+                style={{
+                  padding: '6px 16px', cursor: 'pointer',
+                  fontSize: '0.72rem', letterSpacing: '0.08em',
+                  fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
+                  background: addingService ? 'rgba(201,168,76,0.12)' : 'none',
+                  border: addingService ? '1px solid #C9A84C55' : '1px solid #2a2a2a',
+                  color: addingService ? '#C9A84C' : '#777',
+                }}
+              >
+                {addingService ? '✕ Cancel' : '+ Add Service'}
+              </button>
+            </div>
+
+            {addingService && (
+              <div style={{
+                padding: '16px 20px', borderBottom: '1px solid #181818',
+                background: 'rgba(201,168,76,0.03)',
+              }}>
+                <div style={{ fontSize: '0.65rem', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12 }}>
+                  New Service
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: 2, minWidth: 160 }}>
+                    <label style={{ fontSize: '0.6rem', color: '#555', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Name</label>
+                    <input
+                      type="text"
+                      value={newService.name}
+                      onChange={e => setNewService(p => ({ ...p, name: e.target.value }))}
+                      placeholder="e.g. Skin Fade"
+                      style={{
+                        background: '#181818', border: '1px solid #2a2a2a',
+                        color: '#F2F2F2', padding: '7px 10px',
+                        fontSize: '0.85rem', fontFamily: 'DM Sans, sans-serif',
+                        outline: 'none', width: '100%',
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label style={{ fontSize: '0.6rem', color: '#555', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Category</label>
+                    <select
+                      value={newService.category}
+                      onChange={e => setNewService(p => ({ ...p, category: e.target.value }))}
+                      style={{
+                        background: '#181818', border: '1px solid #2a2a2a',
+                        color: '#F2F2F2', padding: '7px 10px',
+                        fontSize: '0.85rem', fontFamily: 'DM Sans, sans-serif',
+                        outline: 'none', colorScheme: 'dark',
+                        appearance: 'none', WebkitAppearance: 'none', minWidth: 140,
+                      }}
+                    >
+                      {CATEGORIES.map(c => (
+                        <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label style={{ fontSize: '0.6rem', color: '#555', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Duration (mins)</label>
+                    <input
+                      type="number"
+                      value={newService.duration_mins}
+                      onChange={e => setNewService(p => ({ ...p, duration_mins: Number(e.target.value) }))}
+                      min={5} step={5}
+                      style={{
+                        background: '#181818', border: '1px solid #2a2a2a',
+                        color: '#F2F2F2', padding: '7px 10px',
+                        fontSize: '0.85rem', fontFamily: 'DM Sans, sans-serif',
+                        outline: 'none', width: 90, colorScheme: 'dark',
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label style={{ fontSize: '0.6rem', color: '#555', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Price (€)</label>
+                    <input
+                      type="number"
+                      value={newService.price}
+                      onChange={e => setNewService(p => ({ ...p, price: Number(e.target.value) }))}
+                      min={0} step={0.5}
+                      style={{
+                        background: '#181818', border: '1px solid #2a2a2a',
+                        color: '#F2F2F2', padding: '7px 10px',
+                        fontSize: '0.85rem', fontFamily: 'DM Sans, sans-serif',
+                        outline: 'none', width: 80, colorScheme: 'dark',
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={saveNewService}
+                    disabled={!newService.name.trim() || savingService}
+                    style={{
+                      padding: '7px 20px',
+                      background: newService.name.trim() ? '#C9A84C' : '#1e1e1e',
+                      border: 'none',
+                      color: newService.name.trim() ? '#0A0A0A' : '#444',
+                      fontFamily: 'Bebas Neue, sans-serif',
+                      fontSize: '0.95rem', letterSpacing: '0.08em',
+                      cursor: newService.name.trim() ? 'pointer' : 'not-allowed',
+                      transition: 'all 0.15s',
+                      opacity: savingService ? 0.6 : 1,
+                    }}
+                  >
+                    {savingService ? 'Saving...' : 'Add'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div style={{ padding: '8px 20px 16px' }}>
+              {CATEGORIES.map(cat => {
+                const catServices = services.filter(s => s.category === cat);
+                if (catServices.length === 0) return null;
+                return (
+                  <div key={cat} style={{ marginBottom: 20 }}>
+                    <div style={{
+                      fontSize: '0.62rem', color: '#C9A84C',
+                      letterSpacing: '0.15em', textTransform: 'uppercase',
+                      fontWeight: 600, padding: '10px 0 6px',
+                      borderBottom: '1px solid #1a1a1a',
+                      marginBottom: 6,
+                    }}>
+                      {CATEGORY_LABELS[cat]} ({catServices.length})
+                    </div>
+                    {catServices.map(service => {
+                      const isEditing  = editingServiceId === service.id;
+                      const isDeleting = deletingServiceId === service.id;
+
+                      if (isEditing) {
+                        return (
+                          <div key={service.id} style={{
+                            display: 'flex', gap: 8, alignItems: 'center',
+                            padding: '8px 0', borderBottom: '1px solid #161616',
+                            flexWrap: 'wrap', background: 'rgba(201,168,76,0.03)',
+                          }}>
+                            <input
+                              type="text"
+                              value={editingService.name ?? ''}
+                              onChange={e => setEditingService(p => ({ ...p, name: e.target.value }))}
+                              style={{
+                                background: '#181818', border: '1px solid #C9A84C55',
+                                color: '#F2F2F2', padding: '6px 10px',
+                                fontSize: '0.85rem', fontFamily: 'DM Sans, sans-serif',
+                                outline: 'none', flex: 2, minWidth: 120,
+                              }}
+                            />
+                            <select
+                              value={editingService.category ?? 'haircuts'}
+                              onChange={e => setEditingService(p => ({ ...p, category: e.target.value }))}
+                              style={{
+                                background: '#181818', border: '1px solid #C9A84C55',
+                                color: '#F2F2F2', padding: '6px 10px',
+                                fontSize: '0.82rem', fontFamily: 'DM Sans, sans-serif',
+                                outline: 'none', colorScheme: 'dark',
+                                appearance: 'none', WebkitAppearance: 'none', minWidth: 130,
+                              }}
+                            >
+                              {CATEGORIES.map(c => (
+                                <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+                              ))}
+                            </select>
+                            <input
+                              type="number"
+                              value={editingService.duration_mins ?? 30}
+                              onChange={e => setEditingService(p => ({ ...p, duration_mins: Number(e.target.value) }))}
+                              min={5} step={5}
+                              style={{
+                                background: '#181818', border: '1px solid #C9A84C55',
+                                color: '#F2F2F2', padding: '6px 10px',
+                                fontSize: '0.82rem', fontFamily: 'DM Sans, sans-serif',
+                                outline: 'none', width: 70, colorScheme: 'dark',
+                              }}
+                            />
+                            <input
+                              type="number"
+                              value={editingService.price ?? 0}
+                              onChange={e => setEditingService(p => ({ ...p, price: Number(e.target.value) }))}
+                              min={0} step={0.5}
+                              style={{
+                                background: '#181818', border: '1px solid #C9A84C55',
+                                color: '#F2F2F2', padding: '6px 10px',
+                                fontSize: '0.82rem', fontFamily: 'DM Sans, sans-serif',
+                                outline: 'none', width: 70, colorScheme: 'dark',
+                              }}
+                            />
+                            <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+                              <button
+                                onClick={saveEditService}
+                                disabled={savingService}
+                                style={{
+                                  padding: '5px 14px', background: '#C9A84C', border: 'none',
+                                  color: '#0A0A0A', cursor: 'pointer',
+                                  fontFamily: 'Bebas Neue, sans-serif', fontSize: '0.85rem',
+                                  letterSpacing: '0.06em', opacity: savingService ? 0.6 : 1,
+                                }}
+                              >
+                                {savingService ? '...' : 'Save'}
+                              </button>
+                              <button
+                                onClick={cancelEditService}
+                                style={{
+                                  padding: '5px 14px', background: 'none',
+                                  border: '1px solid #2a2a2a', color: '#777',
+                                  cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+                                  fontSize: '0.78rem',
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={service.id} style={{
+                          display: 'flex', alignItems: 'center',
+                          padding: '9px 0', borderBottom: '1px solid #161616',
+                          gap: 12, opacity: isDeleting ? 0.4 : 1,
+                          transition: 'opacity 0.2s',
+                        }}>
+                          <div style={{ flex: 2, fontSize: '0.88rem', color: '#F2F2F2', fontFamily: 'DM Sans, sans-serif' }}>
+                            {service.name}
+                          </div>
+                          <div style={{ width: 70, fontSize: '0.78rem', color: '#555', textAlign: 'right' }}>
+                            {formatDuration(service.duration_mins)}
+                          </div>
+                          <div style={{
+                            width: 60, fontFamily: 'Bebas Neue, sans-serif',
+                            fontSize: '1rem', color: '#C9A84C', textAlign: 'right',
+                          }}>
+                            €{service.price}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexShrink: 0 }}>
+                            <button
+                              onClick={() => startEditService(service)}
+                              style={{
+                                padding: '4px 12px', background: 'none',
+                                border: '1px solid #2a2a2a', color: '#777',
+                                cursor: 'pointer', fontSize: '0.68rem',
+                                letterSpacing: '0.08em', fontFamily: 'DM Sans, sans-serif',
+                                transition: 'all 0.15s',
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.borderColor = '#C9A84C55'; e.currentTarget.style.color = '#C9A84C'; }}
+                              onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a2a'; e.currentTarget.style.color = '#777'; }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => deleteService(service.id)}
+                              disabled={isDeleting}
+                              style={{
+                                padding: '4px 12px', background: 'none',
+                                border: '1px solid #f8717122', color: '#f87171',
+                                cursor: isDeleting ? 'not-allowed' : 'pointer',
+                                fontSize: '0.68rem', letterSpacing: '0.08em',
+                                fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
+                              }}
+                              onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.background = 'rgba(248,113,113,0.08)'; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+                            >
+                              {isDeleting ? '...' : 'Remove'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
