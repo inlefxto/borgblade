@@ -189,14 +189,39 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
           String(b.time_slot).substring(0, 5)
         );
 
-        const allSlots = generateTimeSlots();
+        const { data: blockedData } = await supabase
+          .from('blocked_slots')
+          .select('time_slot, staff_id')
+          .eq('date', selectedDate);
+
+        const blockedSlots = (blockedData || [])
+          .filter(b => b.staff_id === null || b.staff_id === selectedStaff.id)
+          .map(b => String(b.time_slot).substring(0, 5));
+
+        const dowName = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][new Date(selectedDate + 'T00:00:00').getDay()];
+        const dayOverride = selectedStaff.day_hours?.[dowName];
+        const startStr = dayOverride?.start ?? String(selectedStaff.start_time).substring(0, 5);
+        const endStr   = dayOverride?.end   ?? String(selectedStaff.end_time).substring(0, 5);
+
+        const [startH, startM] = startStr.split(':').map(Number);
+        const [endH,   endM]   = endStr.split(':').map(Number);
+        const startMins = startH * 60 + startM;
+        const endMins   = endH   * 60 + endM;
+
+        const allSlots: string[] = [];
+        for (let mins = startMins; mins < endMins; mins += 30) {
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          allSlots.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+        }
+
         const now = new Date();
         const isToday = selectedDate === now.toLocaleDateString('en-CA');
-        const slotDurationMins = 30;
-        const slotsNeeded = Math.ceil(selectedService.duration_mins / slotDurationMins);
+        const slotsNeeded = Math.ceil(selectedService.duration_mins / 30);
+        const unavailable = new Set([...bookedSlots, ...blockedSlots]);
 
         const availableSlots = allSlots.filter(slot => {
-          if (bookedSlots.includes(slot)) return false;
+          if (unavailable.has(slot)) return false;
           if (isToday) {
             const [h, m] = slot.split(':').map(Number);
             const slotTime = new Date();
@@ -206,7 +231,7 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
           const slotIndex = allSlots.indexOf(slot);
           for (let i = 1; i < slotsNeeded; i++) {
             const nextSlot = allSlots[slotIndex + i];
-            if (!nextSlot || bookedSlots.includes(nextSlot)) return false;
+            if (!nextSlot || unavailable.has(nextSlot)) return false;
           }
           return true;
         });
