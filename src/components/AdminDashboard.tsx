@@ -47,6 +47,15 @@ interface ClosedDate {
   reason: string | null;
 }
 
+interface AnalyticsBooking {
+  id: string;
+  booking_date: string;
+  status: string;
+  staff_id: string;
+  services: { name: string; price: number } | null;
+  staff: { name: string } | null;
+}
+
 interface BlockedSlot {
   id: number;
   date: string;
@@ -375,7 +384,10 @@ export default function AdminDashboard() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [addModal, setAddModal] = useState<{ barberId: string; barberName: string } | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
-  const [activeView, setActiveView] = useState<'bookings' | 'settings'>('bookings');
+  const [activeView, setActiveView] = useState<'bookings' | 'settings' | 'analytics'>('bookings');
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsBooking[]>([]);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<'today' | 'week' | 'month'>('week');
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [businessHours, setBusinessHours] = useState<BusinessHours[]>([]);
   const [savingDay, setSavingDay] = useState<number | null>(null);
   const [hoursSaved, setHoursSaved] = useState<number | null>(null);
@@ -477,6 +489,19 @@ export default function AdminDashboard() {
     if (data) setBlockedSlots(data as BlockedSlot[]);
   }, []);
 
+  const fetchAnalytics = useCallback(async () => {
+    setLoadingAnalytics(true);
+    const from = new Date();
+    from.setDate(from.getDate() - 60);
+    const fromStr = `${from.getFullYear()}-${String(from.getMonth()+1).padStart(2,'0')}-${String(from.getDate()).padStart(2,'0')}`;
+    const { data } = await supabase
+      .from('bookings')
+      .select('id, booking_date, status, staff_id, services(name, price), staff(name)')
+      .gte('booking_date', fromStr);
+    if (data) setAnalyticsData(data as AnalyticsBooking[]);
+    setLoadingAnalytics(false);
+  }, []);
+
   useEffect(() => {
     if (authed) {
       fetchBookings();
@@ -485,8 +510,9 @@ export default function AdminDashboard() {
       fetchStaffSchedules();
       fetchClosedDates();
       fetchBlockedSlots();
+      fetchAnalytics();
     }
-  }, [authed, fetchBookings, fetchServices, fetchBusinessHours, fetchStaffSchedules, fetchClosedDates, fetchBlockedSlots]);
+  }, [authed, fetchBookings, fetchServices, fetchBusinessHours, fetchStaffSchedules, fetchClosedDates, fetchBlockedSlots, fetchAnalytics]);
 
   // ── Login screen ──────────────────────────────────────────────────────────
 
@@ -861,6 +887,17 @@ export default function AdminDashboard() {
               }}
             >Show Completed</button>
             <button
+              onClick={() => setActiveView(v => v === 'analytics' ? 'bookings' : 'analytics')}
+              style={{
+                background: activeView === 'analytics' ? 'rgba(201,168,76,0.1)' : 'none',
+                border: activeView === 'analytics' ? '1px solid #C9A84C55' : '1px solid #1e1e1e',
+                color: activeView === 'analytics' ? '#C9A84C' : '#555',
+                padding: '5px 14px', cursor: 'pointer', fontSize: '0.7rem',
+                letterSpacing: '0.08em', fontFamily: 'DM Sans, sans-serif',
+                transition: 'all 0.15s', whiteSpace: 'nowrap',
+              }}
+            >Analytics</button>
+            <button
               onClick={() => setActiveView(v => v === 'settings' ? 'bookings' : 'settings')}
               style={{
                 background: activeView === 'settings' ? 'rgba(201,168,76,0.1)' : 'none',
@@ -921,7 +958,174 @@ export default function AdminDashboard() {
         >&#8250;</button>
       </div>
 
-      {activeView === 'settings' ? (
+      {activeView === 'analytics' ? (
+
+        <div className="admin-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '20px 32px' }}>
+          {loadingAnalytics ? (
+            <div style={{ textAlign: 'center', padding: '80px 0', color: '#333', fontSize: '0.82rem', letterSpacing: '0.12em' }}>Loading...</div>
+          ) : (() => {
+            const now = new Date();
+
+            const getStart = (period: 'today' | 'week' | 'month') => {
+              if (period === 'today') return todayStr();
+              if (period === 'week') {
+                const d = new Date(now);
+                const day = d.getDay();
+                d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+              }
+              return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+            };
+
+            const start = getStart(analyticsPeriod);
+            const filtered = analyticsData.filter(b =>
+              b.booking_date >= start && b.booking_date <= todayStr()
+            );
+
+            const confirmed  = filtered.filter(b => b.status === 'confirmed');
+            const completed  = filtered.filter(b => b.status === 'completed');
+            const cancelled  = filtered.filter(b => b.status === 'cancelled');
+            const noShows    = filtered.filter(b => b.status === 'no-show');
+
+            const completedRevenue = completed.reduce((sum, b) => sum + (b.services?.price ?? 0), 0);
+            const confirmedRevenue = confirmed.reduce((sum, b) => sum + (b.services?.price ?? 0), 0);
+            const totalBookings    = filtered.filter(b => b.status !== 'cancelled').length;
+
+            const barberStats = BARBERS.map(barber => {
+              const barberBookings = filtered.filter(b => b.staff_id === barber.id);
+              return {
+                name: barber.name,
+                total: barberBookings.filter(b => b.status !== 'cancelled').length,
+                completed: barberBookings.filter(b => b.status === 'completed').length,
+                confirmed: barberBookings.filter(b => b.status === 'confirmed').length,
+                cancelled: barberBookings.filter(b => b.status === 'cancelled').length,
+                revenue: barberBookings
+                  .filter(b => b.status === 'completed')
+                  .reduce((sum, b) => sum + (b.services?.price ?? 0), 0),
+              };
+            });
+
+            const serviceCounts: Record<string, { count: number; revenue: number }> = {};
+            filtered
+              .filter(b => b.status !== 'cancelled' && b.services?.name)
+              .forEach(b => {
+                const name = b.services!.name;
+                if (!serviceCounts[name]) serviceCounts[name] = { count: 0, revenue: 0 };
+                serviceCounts[name].count++;
+                if (b.status === 'completed') serviceCounts[name].revenue += b.services!.price;
+              });
+            const topServices = Object.entries(serviceCounts)
+              .sort((a, b) => b[1].count - a[1].count)
+              .slice(0, 6);
+
+            const cellStyle: React.CSSProperties = { fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem' };
+
+            return (
+              <>
+                {/* Period selector */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+                  {(['today', 'week', 'month'] as const).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setAnalyticsPeriod(p)}
+                      style={{
+                        padding: '7px 20px', cursor: 'pointer',
+                        fontSize: '0.72rem', letterSpacing: '0.1em', textTransform: 'uppercase',
+                        fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
+                        background: analyticsPeriod === p ? '#C9A84C' : 'none',
+                        border: analyticsPeriod === p ? 'none' : '1px solid #1e1e1e',
+                        color: analyticsPeriod === p ? '#0A0A0A' : '#555',
+                      }}
+                    >
+                      {p === 'today' ? 'Today' : p === 'week' ? 'This Week' : 'This Month'}
+                    </button>
+                  ))}
+                  <button
+                    onClick={fetchAnalytics}
+                    style={{
+                      marginLeft: 'auto', padding: '7px 16px', cursor: 'pointer',
+                      fontSize: '0.7rem', letterSpacing: '0.08em',
+                      fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
+                      background: 'none', border: '1px solid #1e1e1e', color: '#555',
+                    }}
+                  >Refresh</button>
+                </div>
+
+                {/* KPI Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+                  {[
+                    { label: 'Total Bookings',     value: totalBookings,                      sub: `${cancelled.length} cancelled`,                              color: '#F2F2F2' },
+                    { label: 'Completed Revenue',  value: `€${completedRevenue.toFixed(2)}`,  sub: `${completed.length} completed`,                             color: '#4ade80' },
+                    { label: 'Expected Revenue',   value: `€${confirmedRevenue.toFixed(2)}`,  sub: `${confirmed.length} confirmed`,                             color: '#C9A84C' },
+                    { label: 'No Shows',           value: noShows.length,                     sub: cancelled.length > 0 ? `${cancelled.length} cancellations` : 'None recorded', color: '#f87171' },
+                  ].map(card => (
+                    <div key={card.label} style={{ background: '#0c0c0c', border: '1px solid #181818', padding: '20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ fontSize: '0.62rem', color: '#555', letterSpacing: '0.12em', textTransform: 'uppercase' }}>{card.label}</div>
+                      <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '2rem', color: card.color, lineHeight: 1 }}>{card.value}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#444' }}>{card.sub}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Two-column: barber stats + top services */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+
+                  {/* Per-barber breakdown */}
+                  <div style={{ background: '#0c0c0c', border: '1px solid #181818' }}>
+                    <div style={{ padding: '14px 20px', borderBottom: '1px solid #181818' }}>
+                      <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '0.95rem', letterSpacing: '0.1em', color: '#F2F2F2' }}>Per-Barber Breakdown</div>
+                    </div>
+                    <div style={{ padding: '8px 20px 16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 50px 60px 70px', gap: 8, padding: '8px 0', borderBottom: '1px solid #1a1a1a', marginBottom: 4 }}>
+                        {['Barber', 'Total', 'Done', 'Cancelled', 'Revenue'].map(h => (
+                          <div key={h} style={{ fontSize: '0.6rem', color: '#555', letterSpacing: '0.1em', textTransform: 'uppercase', textAlign: h !== 'Barber' ? 'right' : 'left' }}>{h}</div>
+                        ))}
+                      </div>
+                      {barberStats.map(b => (
+                        <div key={b.name} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 50px 60px 70px', gap: 8, padding: '10px 0', borderBottom: '1px solid #161616', alignItems: 'center' }}>
+                          <div style={{ fontSize: '0.82rem', color: '#F2F2F2', ...cellStyle }}>{b.name.split(' ')[0]}</div>
+                          <div style={{ fontSize: '0.85rem', color: '#F2F2F2', textAlign: 'right', ...cellStyle }}>{b.total}</div>
+                          <div style={{ fontSize: '0.85rem', color: '#4ade80', textAlign: 'right', ...cellStyle }}>{b.completed}</div>
+                          <div style={{ fontSize: '0.85rem', color: '#f87171', textAlign: 'right', ...cellStyle }}>{b.cancelled}</div>
+                          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '0.95rem', color: '#C9A84C', textAlign: 'right' }}>€{b.revenue.toFixed(0)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Top services */}
+                  <div style={{ background: '#0c0c0c', border: '1px solid #181818' }}>
+                    <div style={{ padding: '14px 20px', borderBottom: '1px solid #181818' }}>
+                      <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '0.95rem', letterSpacing: '0.1em', color: '#F2F2F2' }}>Top Services</div>
+                    </div>
+                    <div style={{ padding: '8px 20px 16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px', gap: 8, padding: '8px 0', borderBottom: '1px solid #1a1a1a', marginBottom: 4 }}>
+                        {['Service', 'Booked', 'Revenue'].map(h => (
+                          <div key={h} style={{ fontSize: '0.6rem', color: '#555', letterSpacing: '0.1em', textTransform: 'uppercase', textAlign: h !== 'Service' ? 'right' : 'left' }}>{h}</div>
+                        ))}
+                      </div>
+                      {topServices.length === 0 ? (
+                        <div style={{ padding: '20px 0', textAlign: 'center', color: '#333', fontSize: '0.78rem' }}>No data for this period</div>
+                      ) : topServices.map(([name, stats], i) => (
+                        <div key={name} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px', gap: 8, padding: '10px 0', borderBottom: '1px solid #161616', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: '0.62rem', color: '#333', width: 16 }}>#{i+1}</span>
+                            <span style={{ fontSize: '0.82rem', color: '#F2F2F2', ...cellStyle }}>{name}</span>
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: '#F2F2F2', textAlign: 'right', ...cellStyle }}>{stats.count}</div>
+                          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '0.95rem', color: '#C9A84C', textAlign: 'right' }}>€{stats.revenue.toFixed(0)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              </>
+            );
+          })()}
+        </div>
+
+      ) : activeView === 'settings' ? (
         /* Settings view */
         <div className="admin-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '20px 32px' }}>
           {/* Per-Barber Schedule Panel */}
