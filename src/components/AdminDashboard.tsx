@@ -282,16 +282,18 @@ interface BookingCardProps {
   booking: Booking;
   onComplete: (id: string) => void;
   onCancel: (id: string) => void;
+  onNoShow: (id: string) => void;
   updating: string | null;
   showCompleted: boolean;
 }
 
-function BookingCard({ booking, onComplete, onCancel, updating, showCompleted }: BookingCardProps) {
+function BookingCard({ booking, onComplete, onCancel, onNoShow, updating, showCompleted }: BookingCardProps) {
   const isUpdating = updating === booking.id;
   const statusStyles: Record<string, { bg: string; border: string; text: string }> = {
-    confirmed: { bg: 'rgba(201,168,76,0.08)', border: '#C9A84C33', text: '#C9A84C' },
-    completed: { bg: 'rgba(74,222,128,0.08)', border: '#4ade8033', text: '#4ade80' },
+    confirmed:  { bg: 'rgba(201,168,76,0.08)',  border: '#C9A84C33', text: '#C9A84C' },
+    completed:  { bg: 'rgba(74,222,128,0.08)',  border: '#4ade8033', text: '#4ade80' },
     cancelled:  { bg: 'rgba(248,113,113,0.08)', border: '#f8717133', text: '#f87171' },
+    'no-show':  { bg: 'rgba(249,115,22,0.08)',  border: '#f9731622', text: '#f97316' },
   };
   const ss = statusStyles[booking.status] || statusStyles.confirmed;
 
@@ -367,6 +369,23 @@ function BookingCard({ booking, onComplete, onCancel, updating, showCompleted }:
               onMouseEnter={e => { if (!isUpdating) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.08)'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
             >Cancel</button>
+          )}
+          {booking.status === 'confirmed' && (
+            <button
+              onClick={() => onNoShow(booking.id)}
+              disabled={isUpdating}
+              style={{
+                flex: 1, padding: '6px 0', background: 'none',
+                border: '1px solid #f9731622',
+                color: '#f97316', fontSize: '0.68rem',
+                letterSpacing: '0.08em',
+                cursor: isUpdating ? 'not-allowed' : 'pointer',
+                fontFamily: 'DM Sans, sans-serif',
+                opacity: isUpdating ? 0.4 : 1,
+              }}
+              onMouseEnter={e => { if (!isUpdating) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(249,115,22,0.08)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
+            >No-Show</button>
           )}
         </div>
       )}
@@ -590,13 +609,15 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (authed) {
-      fetchBookings();
-      fetchServices();
-      fetchBusinessHours();
-      fetchStaffSchedules();
-      fetchClosedDates();
-      fetchBlockedSlots();
-      fetchAnalytics();
+      autoCompleteBookings().then(() => {
+        fetchBookings();
+        fetchServices();
+        fetchBusinessHours();
+        fetchStaffSchedules();
+        fetchClosedDates();
+        fetchBlockedSlots();
+        fetchAnalytics();
+      });
     }
   }, [authed, fetchBookings, fetchServices, fetchBusinessHours, fetchStaffSchedules, fetchClosedDates, fetchBlockedSlots, fetchAnalytics]);
 
@@ -919,6 +940,25 @@ export default function AdminDashboard() {
       setBookings(prev => prev.map(b => b.id === id ? { ...b, status } : b));
     }
     setUpdating(null);
+  };
+
+  const autoCompleteBookings = async () => {
+    const today = todayStr();
+    const now = new Date();
+    const currentTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00`;
+
+    await supabase
+      .from('bookings')
+      .update({ status: 'completed' })
+      .eq('status', 'confirmed')
+      .lt('booking_date', today);
+
+    await supabase
+      .from('bookings')
+      .update({ status: 'completed' })
+      .eq('status', 'confirmed')
+      .eq('booking_date', today)
+      .lt('time_slot', currentTime);
   };
 
   return (
@@ -2197,6 +2237,7 @@ export default function AdminDashboard() {
                             booking={booking}
                             onComplete={id => updateStatus(id, 'completed')}
                             onCancel={id => updateStatus(id, 'cancelled')}
+                            onNoShow={id => updateStatus(id, 'no-show')}
                             updating={updating}
                             showCompleted={showCompleted}
                           />
