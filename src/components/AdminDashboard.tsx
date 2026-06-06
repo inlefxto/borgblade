@@ -764,11 +764,16 @@ export default function AdminDashboard() {
                               <button
                                 onClick={() => {
                                   if (!isWorking) {
+                                    // Day is off → turn it on and open editor
                                     toggleWorkingDay(staff.id, d.key);
+                                    setSelectedBarberDay({ staffId: staff.id, day: d.key });
+                                  } else if (isSelected) {
+                                    // Day is on and selected → turn it OFF
+                                    toggleWorkingDay(staff.id, d.key);
+                                    setSelectedBarberDay(null);
                                   } else {
-                                    setSelectedBarberDay(
-                                      isSelected ? null : { staffId: staff.id, day: d.key }
-                                    );
+                                    // Day is on but not selected → open hours editor
+                                    setSelectedBarberDay({ staffId: staff.id, day: d.key });
                                   }
                                 }}
                                 style={{
