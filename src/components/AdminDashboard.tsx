@@ -40,6 +40,12 @@ interface StaffSchedule {
   day_hours: Record<string, { start: string; end: string }>;
 }
 
+interface ClosedDate {
+  id: number;
+  date: string;
+  reason: string | null;
+}
+
 const BARBERS = [
   { id: 'ce5de67b-1424-4d20-85c9-328cdba2f434', name: 'Marco Borg' },
   { id: '68e0e021-ed78-4845-b209-a698863fe365', name: 'Luca Farrugia' },
@@ -367,6 +373,11 @@ export default function AdminDashboard() {
   const [savingStaff, setSavingStaff] = useState<string | null>(null);
   const [staffSaved, setStaffSaved] = useState<string | null>(null);
   const [selectedBarberDay, setSelectedBarberDay] = useState<{ staffId: string; day: string } | null>(null);
+  const [closedDates, setClosedDates] = useState<ClosedDate[]>([]);
+  const [newClosedDate, setNewClosedDate] = useState('');
+  const [newClosedReason, setNewClosedReason] = useState('');
+  const [addingClosedDate, setAddingClosedDate] = useState(false);
+  const [deletingClosedDate, setDeletingClosedDate] = useState<number | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -427,8 +438,9 @@ export default function AdminDashboard() {
       fetchServices();
       fetchBusinessHours();
       fetchStaffSchedules();
+      fetchClosedDates();
     }
-  }, [authed, fetchBookings, fetchServices, fetchBusinessHours, fetchStaffSchedules]);
+  }, [authed, fetchBookings, fetchServices, fetchBusinessHours, fetchStaffSchedules, fetchClosedDates]);
 
   // ── Login screen ──────────────────────────────────────────────────────────
 
@@ -581,6 +593,41 @@ export default function AdminDashboard() {
       };
     }));
   };
+
+  const fetchClosedDates = useCallback(async () => {
+    const { data } = await supabase
+      .from('closed_dates')
+      .select('*')
+      .order('date');
+    if (data) setClosedDates(data as ClosedDate[]);
+  }, []);
+
+  const addClosedDate = async () => {
+    if (!newClosedDate) return;
+    setAddingClosedDate(true);
+    await supabase.from('closed_dates').insert({
+      date: newClosedDate,
+      reason: newClosedReason.trim() || null,
+    });
+    setNewClosedDate('');
+    setNewClosedReason('');
+    await fetchClosedDates();
+    setAddingClosedDate(false);
+  };
+
+  const removeClosedDate = async (id: number) => {
+    setDeletingClosedDate(id);
+    await supabase.from('closed_dates').delete().eq('id', id);
+    setClosedDates(prev => prev.filter(d => d.id !== id));
+    setDeletingClosedDate(null);
+  };
+
+  function formatClosedDate(dateStr: string): string {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    });
+  }
 
   const saveStaffSchedule = async (staff: StaffSchedule) => {
     setSavingStaff(staff.id);
@@ -864,6 +911,147 @@ export default function AdminDashboard() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Close a Specific Date Panel */}
+          <div style={{ background: '#0c0c0c', border: '1px solid #181818', marginBottom: 20 }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #181818' }}>
+              <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '0.1em', color: '#F2F2F2' }}>
+                Close a Specific Date
+              </div>
+              <div style={{ fontSize: '0.68rem', color: '#444', marginTop: 2 }}>
+                Block out one-off dates — public holidays, shop closures, events
+              </div>
+            </div>
+
+            <div style={{ padding: '20px' }}>
+              <div style={{
+                display: 'flex', gap: 10, alignItems: 'flex-end',
+                marginBottom: 24, flexWrap: 'wrap',
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: '0.62rem', color: '#C9A84C', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newClosedDate}
+                    min={todayStr()}
+                    onChange={e => setNewClosedDate(e.target.value)}
+                    style={{
+                      background: '#181818', border: '1px solid #2a2a2a',
+                      color: '#F2F2F2', padding: '8px 12px',
+                      fontSize: '0.85rem', fontFamily: 'DM Sans, sans-serif',
+                      outline: 'none', colorScheme: 'dark',
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 200 }}>
+                  <label style={{ fontSize: '0.62rem', color: '#C9A84C', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    Reason (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newClosedReason}
+                    onChange={e => setNewClosedReason(e.target.value)}
+                    placeholder="e.g. Public Holiday, Staff Training..."
+                    style={{
+                      background: '#181818', border: '1px solid #2a2a2a',
+                      color: '#F2F2F2', padding: '8px 12px',
+                      fontSize: '0.85rem', fontFamily: 'DM Sans, sans-serif',
+                      outline: 'none', width: '100%',
+                    }}
+                  />
+                </div>
+
+                <button
+                  onClick={addClosedDate}
+                  disabled={!newClosedDate || addingClosedDate}
+                  style={{
+                    padding: '8px 20px',
+                    background: newClosedDate ? '#C9A84C' : '#1e1e1e',
+                    border: 'none',
+                    color: newClosedDate ? '#0A0A0A' : '#444',
+                    fontFamily: 'Bebas Neue, sans-serif',
+                    fontSize: '0.95rem', letterSpacing: '0.08em',
+                    cursor: newClosedDate ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.15s', flexShrink: 0,
+                    opacity: addingClosedDate ? 0.6 : 1,
+                  }}
+                >
+                  {addingClosedDate ? 'Adding...' : 'Block Date'}
+                </button>
+              </div>
+
+              {closedDates.length === 0 ? (
+                <div style={{
+                  textAlign: 'center', padding: '24px',
+                  border: '1px dashed #1e1e1e', color: '#333',
+                  fontSize: '0.78rem', letterSpacing: '0.05em',
+                }}>
+                  No dates blocked yet
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {closedDates.map(cd => {
+                    const isPast = cd.date < todayStr();
+                    const isDeleting = deletingClosedDate === cd.id;
+                    return (
+                      <div
+                        key={cd.id}
+                        style={{
+                          display: 'flex', alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 14px',
+                          background: isPast ? '#0e0e0e' : '#111',
+                          border: `1px solid ${isPast ? '#161616' : '#1e1e1e'}`,
+                          opacity: isPast ? 0.5 : 1,
+                        }}
+                      >
+                        <div>
+                          <div style={{
+                            fontSize: '0.85rem', color: isPast ? '#555' : '#F2F2F2',
+                            fontFamily: 'DM Sans, sans-serif',
+                          }}>
+                            {formatClosedDate(cd.date)}
+                          </div>
+                          {cd.reason && (
+                            <div style={{ fontSize: '0.72rem', color: '#C9A84C', marginTop: 2 }}>
+                              {cd.reason}
+                            </div>
+                          )}
+                          {isPast && (
+                            <div style={{ fontSize: '0.65rem', color: '#444', marginTop: 2 }}>
+                              Past date
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => removeClosedDate(cd.id)}
+                          disabled={isDeleting}
+                          style={{
+                            background: 'none',
+                            border: '1px solid #f8717122',
+                            color: '#f87171', padding: '5px 14px',
+                            cursor: isDeleting ? 'not-allowed' : 'pointer',
+                            fontSize: '0.68rem', letterSpacing: '0.08em',
+                            fontFamily: 'DM Sans, sans-serif',
+                            transition: 'all 0.15s',
+                            opacity: isDeleting ? 0.5 : 1,
+                          }}
+                          onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.background = 'rgba(248,113,113,0.08)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+                        >
+                          {isDeleting ? 'Removing...' : 'Remove'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
