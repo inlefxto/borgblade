@@ -46,6 +46,15 @@ interface ClosedDate {
   reason: string | null;
 }
 
+interface BlockedSlot {
+  id: number;
+  date: string;
+  time_slot: string;
+  reason: string | null;
+  staff_id: string | null;
+  staff?: { name: string } | null;
+}
+
 const BARBERS = [
   { id: 'ce5de67b-1424-4d20-85c9-328cdba2f434', name: 'Marco Borg' },
   { id: '68e0e021-ed78-4845-b209-a698863fe365', name: 'Luca Farrugia' },
@@ -378,6 +387,14 @@ export default function AdminDashboard() {
   const [newClosedReason, setNewClosedReason] = useState('');
   const [addingClosedDate, setAddingClosedDate] = useState(false);
   const [deletingClosedDate, setDeletingClosedDate] = useState<number | null>(null);
+  const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
+  const [blockMode, setBlockMode] = useState<'single' | 'from' | 'fullday'>('single');
+  const [blockStaffId, setBlockStaffId] = useState<string>('all');
+  const [blockDate, setBlockDate] = useState('');
+  const [blockTime, setBlockTime] = useState('');
+  const [blockReason, setBlockReason] = useState('');
+  const [addingBlock, setAddingBlock] = useState(false);
+  const [deletingBlockGroup, setDeletingBlockGroup] = useState<string | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -440,6 +457,16 @@ export default function AdminDashboard() {
     if (data) setClosedDates(data as ClosedDate[]);
   }, []);
 
+  const fetchBlockedSlots = useCallback(async () => {
+    const { data } = await supabase
+      .from('blocked_slots')
+      .select('*, staff(name)')
+      .gte('date', todayStr())
+      .order('date')
+      .order('time_slot');
+    if (data) setBlockedSlots(data as BlockedSlot[]);
+  }, []);
+
   useEffect(() => {
     if (authed) {
       fetchBookings();
@@ -447,8 +474,9 @@ export default function AdminDashboard() {
       fetchBusinessHours();
       fetchStaffSchedules();
       fetchClosedDates();
+      fetchBlockedSlots();
     }
-  }, [authed, fetchBookings, fetchServices, fetchBusinessHours, fetchStaffSchedules, fetchClosedDates]);
+  }, [authed, fetchBookings, fetchServices, fetchBusinessHours, fetchStaffSchedules, fetchClosedDates, fetchBlockedSlots]);
 
   // ── Login screen ──────────────────────────────────────────────────────────
 
@@ -620,6 +648,58 @@ export default function AdminDashboard() {
     await supabase.from('closed_dates').delete().eq('id', id);
     setClosedDates(prev => prev.filter(d => d.id !== id));
     setDeletingClosedDate(null);
+  };
+
+  const ALL_TIME_SLOTS = [
+    '09:00','09:30','10:00','10:30','11:00','11:30',
+    '12:00','12:30','13:00','13:30','14:00','14:30',
+    '15:00','15:30','16:00','16:30','17:00','17:30',
+    '18:00','18:30',
+  ];
+
+  const addBlockedSlots = async () => {
+    if (!blockDate) return;
+    if (blockMode !== 'fullday' && !blockTime) return;
+    setAddingBlock(true);
+
+    let slotsToBlock: string[] = [];
+    if (blockMode === 'single') {
+      slotsToBlock = [blockTime];
+    } else if (blockMode === 'from') {
+      slotsToBlock = ALL_TIME_SLOTS.filter(s => s >= blockTime);
+    } else {
+      slotsToBlock = [...ALL_TIME_SLOTS];
+    }
+
+    await supabase.from('blocked_slots').insert(
+      slotsToBlock.map(slot => ({
+        date: blockDate,
+        time_slot: slot,
+        reason: blockReason.trim() || null,
+        staff_id: blockStaffId === 'all' ? null : blockStaffId,
+      }))
+    );
+
+    setBlockDate('');
+    setBlockTime('');
+    setBlockReason('');
+    setBlockStaffId('all');
+    setBlockMode('single');
+    await fetchBlockedSlots();
+    setAddingBlock(false);
+  };
+
+  const removeBlockedGroup = async (date: string, staffId: string | null, groupKey: string) => {
+    setDeletingBlockGroup(groupKey);
+    let query = supabase.from('blocked_slots').delete().eq('date', date);
+    if (staffId) {
+      query = query.eq('staff_id', staffId);
+    } else {
+      query = query.is('staff_id', null);
+    }
+    await query;
+    await fetchBlockedSlots();
+    setDeletingBlockGroup(null);
   };
 
   function formatClosedDate(dateStr: string): string {
@@ -1052,6 +1132,261 @@ export default function AdminDashboard() {
                   })}
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Block a Time Slot Panel */}
+          <div style={{ background: '#0c0c0c', border: '1px solid #181818', marginBottom: 20 }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #181818' }}>
+              <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '0.1em', color: '#F2F2F2' }}>
+                Block Time Slots
+              </div>
+              <div style={{ fontSize: '0.68rem', color: '#444', marginTop: 2 }}>
+                Block a single slot, from a time onwards, or a full day — per barber or all
+              </div>
+            </div>
+
+            <div style={{ padding: '20px' }}>
+              {/* Mode selector */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+                {([
+                  { key: 'single',  label: 'Single Slot' },
+                  { key: 'from',    label: 'From Time Onwards' },
+                  { key: 'fullday', label: 'Full Day' },
+                ] as const).map(m => (
+                  <button
+                    key={m.key}
+                    onClick={() => { setBlockMode(m.key); setBlockTime(''); }}
+                    style={{
+                      padding: '6px 14px', cursor: 'pointer',
+                      fontSize: '0.72rem', letterSpacing: '0.08em',
+                      fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
+                      background: blockMode === m.key ? 'rgba(201,168,76,0.12)' : '#111',
+                      border: blockMode === m.key ? '1px solid #C9A84C55' : '1px solid #222',
+                      color: blockMode === m.key ? '#C9A84C' : '#555',
+                    }}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Form */}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 24 }}>
+                {/* Barber selector */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: '0.62rem', color: '#C9A84C', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    Barber
+                  </label>
+                  <select
+                    value={blockStaffId}
+                    onChange={e => setBlockStaffId(e.target.value)}
+                    style={{
+                      background: '#181818', border: '1px solid #2a2a2a',
+                      color: '#F2F2F2', padding: '8px 12px',
+                      fontSize: '0.85rem', fontFamily: 'DM Sans, sans-serif',
+                      outline: 'none', colorScheme: 'dark',
+                      appearance: 'none', WebkitAppearance: 'none', minWidth: 160,
+                    }}
+                  >
+                    <option value="all">All Barbers</option>
+                    {staffSchedules.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date picker */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: '0.62rem', color: '#C9A84C', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={blockDate}
+                    min={todayStr()}
+                    onChange={e => setBlockDate(e.target.value)}
+                    style={{
+                      background: '#181818', border: '1px solid #2a2a2a',
+                      color: '#F2F2F2', padding: '8px 12px',
+                      fontSize: '0.85rem', fontFamily: 'DM Sans, sans-serif',
+                      outline: 'none', colorScheme: 'dark',
+                    }}
+                  />
+                </div>
+
+                {/* Time picker — hidden for Full Day */}
+                {blockMode !== 'fullday' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: '0.62rem', color: '#C9A84C', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                      {blockMode === 'from' ? 'From Time' : 'Time Slot'}
+                    </label>
+                    <select
+                      value={blockTime}
+                      onChange={e => setBlockTime(e.target.value)}
+                      style={{
+                        background: '#181818', border: '1px solid #2a2a2a',
+                        color: blockTime ? '#F2F2F2' : '#555',
+                        padding: '8px 12px', fontSize: '0.85rem',
+                        fontFamily: 'DM Sans, sans-serif', outline: 'none',
+                        colorScheme: 'dark', appearance: 'none',
+                        WebkitAppearance: 'none', minWidth: 120,
+                      }}
+                    >
+                      <option value="">Select time</option>
+                      {ALL_TIME_SLOTS.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Reason */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 160 }}>
+                  <label style={{ fontSize: '0.62rem', color: '#C9A84C', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    Reason (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={blockReason}
+                    onChange={e => setBlockReason(e.target.value)}
+                    placeholder="e.g. Staff training, Personal..."
+                    style={{
+                      background: '#181818', border: '1px solid #2a2a2a',
+                      color: '#F2F2F2', padding: '8px 12px',
+                      fontSize: '0.85rem', fontFamily: 'DM Sans, sans-serif',
+                      outline: 'none', width: '100%',
+                    }}
+                  />
+                </div>
+
+                {/* Block button */}
+                <button
+                  onClick={addBlockedSlots}
+                  disabled={!blockDate || (blockMode !== 'fullday' && !blockTime) || addingBlock}
+                  style={{
+                    padding: '8px 20px', flexShrink: 0,
+                    background: (blockDate && (blockMode === 'fullday' || blockTime)) ? '#C9A84C' : '#1e1e1e',
+                    border: 'none',
+                    color: (blockDate && (blockMode === 'fullday' || blockTime)) ? '#0A0A0A' : '#444',
+                    fontFamily: 'Bebas Neue, sans-serif',
+                    fontSize: '0.95rem', letterSpacing: '0.08em',
+                    cursor: (blockDate && (blockMode === 'fullday' || blockTime)) ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.15s',
+                    opacity: addingBlock ? 0.6 : 1,
+                  }}
+                >
+                  {addingBlock ? 'Blocking...' : 'Block'}
+                </button>
+              </div>
+
+              {/* List of blocked slots grouped by date + barber */}
+              {(() => {
+                const groups: Record<string, {
+                  date: string;
+                  staff_id: string | null;
+                  staffName: string;
+                  reason: string | null;
+                  slots: string[];
+                }> = {};
+
+                blockedSlots.forEach(slot => {
+                  const key = `${slot.date}__${slot.staff_id || 'all'}`;
+                  if (!groups[key]) {
+                    groups[key] = {
+                      date: slot.date,
+                      staff_id: slot.staff_id,
+                      staffName: slot.staff?.name || 'All Barbers',
+                      reason: slot.reason,
+                      slots: [],
+                    };
+                  }
+                  groups[key].slots.push(String(slot.time_slot).substring(0, 5));
+                });
+
+                const groupList = Object.entries(groups);
+
+                if (groupList.length === 0) return (
+                  <div style={{
+                    textAlign: 'center', padding: '24px',
+                    border: '1px dashed #1e1e1e', color: '#333',
+                    fontSize: '0.78rem', letterSpacing: '0.05em',
+                  }}>
+                    No slots blocked yet
+                  </div>
+                );
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {groupList.map(([key, group]) => {
+                      const isDeleting = deletingBlockGroup === key;
+                      const isFullDay = group.slots.length >= ALL_TIME_SLOTS.length;
+                      const isFromTime = !isFullDay && group.slots.length > 1;
+
+                      return (
+                        <div
+                          key={key}
+                          style={{
+                            display: 'flex', alignItems: 'center',
+                            justifyContent: 'space-between', gap: 16,
+                            padding: '12px 14px',
+                            background: '#111', border: '1px solid #1e1e1e',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 4 }}>
+                              <span style={{ fontSize: '0.85rem', color: '#F2F2F2', fontFamily: 'DM Sans, sans-serif' }}>
+                                {formatClosedDate(group.date)}
+                              </span>
+                              <span style={{
+                                fontSize: '0.65rem', color: '#C9A84C',
+                                letterSpacing: '0.08em', padding: '2px 8px',
+                                background: 'rgba(201,168,76,0.08)',
+                                border: '1px solid #C9A84C33',
+                              }}>
+                                {group.staffName}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#555', marginBottom: group.reason ? 3 : 0 }}>
+                              {isFullDay
+                                ? 'Full day blocked'
+                                : isFromTime
+                                  ? `${group.slots[0]} onwards (${group.slots.length} slots)`
+                                  : `${group.slots[0]}`
+                              }
+                            </div>
+                            {group.reason && (
+                              <div style={{ fontSize: '0.72rem', color: '#C9A84C' }}>
+                                {group.reason}
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => removeBlockedGroup(group.date, group.staff_id, key)}
+                            disabled={isDeleting}
+                            style={{
+                              background: 'none',
+                              border: '1px solid #f8717122',
+                              color: '#f87171', padding: '5px 14px',
+                              cursor: isDeleting ? 'not-allowed' : 'pointer',
+                              fontSize: '0.68rem', letterSpacing: '0.08em',
+                              fontFamily: 'DM Sans, sans-serif',
+                              transition: 'all 0.15s', flexShrink: 0,
+                              opacity: isDeleting ? 0.5 : 1,
+                            }}
+                            onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.background = 'rgba(248,113,113,0.08)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+                          >
+                            {isDeleting ? 'Removing...' : 'Remove'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
