@@ -1,0 +1,1 @@
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS day_hours jsonb NOT NULL DEFAULT '{}'::jsonb;
