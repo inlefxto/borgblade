@@ -1088,7 +1088,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Date navigation */}
-      <div className="date-nav" style={{ background: '#0a0a0a', borderBottom: '1px solid #161616', padding: '14px 32px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 28 }}>
+      {activeView === 'bookings' && <div className="date-nav" style={{ background: '#0a0a0a', borderBottom: '1px solid #161616', padding: '14px 32px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 28 }}>
         <button
           onClick={() => setSelectedDate(d => addDays(d, -1))}
           style={{ background: 'none', border: '1px solid #1e1e1e', color: '#666', width: 36, height: 36, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', transition: 'all 0.15s', flexShrink: 0 }}
@@ -1119,7 +1119,7 @@ export default function AdminDashboard() {
           onMouseLeave={e => { e.currentTarget.style.borderColor = '#1e1e1e'; e.currentTarget.style.color = '#666'; }}
           aria-label="Next day"
         >&#8250;</button>
-      </div>
+      </div>}
 
       {activeView === 'clients' ? (
         <div className="admin-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '20px 32px' }}>
