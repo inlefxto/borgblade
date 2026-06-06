@@ -14,6 +14,10 @@ interface Staff {
   name: string;
   role: string;
   photo_url: string | null;
+  working_days: string[];
+  start_time: string;
+  end_time: string;
+  day_hours?: Record<string, { start: string; end: string }>;
 }
 
 interface BookingModalProps {
@@ -63,6 +67,8 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_ORDER = ['haircuts', 'beard', 'combos', 'extras'];
 
+const DOW_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
 function generateTimeSlots(): string[] {
   const slots: string[] = [];
   for (let h = 9; h < 18; h++) {
@@ -104,6 +110,7 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
   const [step, setStep] = useState(1);
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [closedDates, setClosedDates] = useState<string[]>([]);
 
 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -156,10 +163,12 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
       setLoadingData(true);
       Promise.all([
         supabase.from('services').select('id, name, duration_mins, price, category').order('category'),
-        supabase.from('staff').select('*'),
-      ]).then(([{ data: svcData }, { data: staffData }]) => {
+        supabase.from('staff').select('id, name, role, photo_url, working_days, start_time, end_time, day_hours'),
+        supabase.from('closed_dates').select('date'),
+      ]).then(([{ data: svcData }, { data: staffData }, { data: closedData }]) => {
         if (svcData) setServices(svcData);
         if (staffData) setStaff(staffData);
+        if (closedData) setClosedDates(closedData.map(d => d.date));
         setLoadingData(false);
       });
     }
@@ -303,27 +312,46 @@ export default function BookingModal({ isOpen, onClose, preSelectedService }: Bo
           {Array.from({ length: daysInMonth }).map((_, i) => {
             const day = i + 1;
             const date = new Date(year, month, day);
-            const dateStr = formatDate(date);
             const dow = date.getDay();
-            const isSelectable = [2, 3, 4, 5, 6].includes(dow) && date >= today;
-            const isSelected = selectedDate === dateStr;
+            const dayName = DOW_NAMES[dow];
+            const dateStr = formatDate(date);
             const isPast = date < today;
+            const isClosedDate = closedDates.includes(dateStr);
+            const barberWorksThisDay = selectedStaff?.working_days?.includes(dayName) ?? false;
+            const isSelectable = !isPast && !isClosedDate && barberWorksThisDay;
+            const isSelected = selectedDate === dateStr;
             return (
               <button
                 key={day}
                 onClick={() => { if (isSelectable) { setSelectedDate(dateStr); setSelectedTime(''); } }}
                 style={{
                   padding: '8px 4px',
-                  background: isSelected ? '#C9A84C' : 'transparent',
-                  color: isSelected ? '#0A0A0A' : isPast || !isSelectable ? '#333' : '#F2F2F2',
-                  border: isSelected ? 'none' : '1px solid transparent',
+                  background: isSelected
+                    ? '#C9A84C'
+                    : isClosedDate
+                      ? 'rgba(248,113,113,0.05)'
+                      : 'transparent',
+                  color: isSelected
+                    ? '#0A0A0A'
+                    : isClosedDate
+                      ? '#3a2020'
+                      : isPast || !barberWorksThisDay
+                        ? '#2a2a2a'
+                        : '#F2F2F2',
+                  border: isSelected
+                    ? 'none'
+                    : isClosedDate
+                      ? '1px solid rgba(248,113,113,0.1)'
+                      : '1px solid transparent',
                   cursor: isSelectable ? 'pointer' : 'default',
                   fontSize: '0.85rem',
                   fontWeight: isSelected ? 700 : 400,
                   transition: 'background 0.15s, color 0.15s',
+                  position: 'relative' as const,
                 }}
+                title={isClosedDate ? 'Closed' : !barberWorksThisDay && !isPast ? 'Barber not available' : undefined}
                 onMouseEnter={(e) => { if (isSelectable && !isSelected) (e.currentTarget as HTMLButtonElement).style.background = '#1e1e1e'; }}
-                onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = isClosedDate ? 'rgba(248,113,113,0.05)' : 'transparent'; }}
               >
                 {day}
               </button>
