@@ -30,6 +30,15 @@ interface BusinessHours {
   is_closed: boolean;
 }
 
+interface StaffSchedule {
+  id: string;
+  name: string;
+  role: string;
+  working_days: string[];
+  start_time: string;
+  end_time: string;
+}
+
 const BARBERS = [
   { id: 'ce5de67b-1424-4d20-85c9-328cdba2f434', name: 'Marco Borg' },
   { id: '68e0e021-ed78-4845-b209-a698863fe365', name: 'Luca Farrugia' },
@@ -353,6 +362,9 @@ export default function AdminDashboard() {
   const [businessHours, setBusinessHours] = useState<BusinessHours[]>([]);
   const [savingDay, setSavingDay] = useState<number | null>(null);
   const [hoursSaved, setHoursSaved] = useState<number | null>(null);
+  const [staffSchedules, setStaffSchedules] = useState<StaffSchedule[]>([]);
+  const [savingStaff, setSavingStaff] = useState<string | null>(null);
+  const [staffSaved, setStaffSaved] = useState<string | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -399,13 +411,22 @@ export default function AdminDashboard() {
     if (data) setBusinessHours(data as BusinessHours[]);
   }, []);
 
+  const fetchStaffSchedules = useCallback(async () => {
+    const { data } = await supabase
+      .from('staff')
+      .select('id, name, role, working_days, start_time, end_time')
+      .order('name');
+    if (data) setStaffSchedules(data as StaffSchedule[]);
+  }, []);
+
   useEffect(() => {
     if (authed) {
       fetchBookings();
       fetchServices();
       fetchBusinessHours();
+      fetchStaffSchedules();
     }
-  }, [authed, fetchBookings, fetchServices, fetchBusinessHours]);
+  }, [authed, fetchBookings, fetchServices, fetchBusinessHours, fetchStaffSchedules]);
 
   // ── Login screen ──────────────────────────────────────────────────────────
 
@@ -514,6 +535,47 @@ export default function AdminDashboard() {
     setBusinessHours(prev => prev.map(h =>
       h.day_of_week === dayOfWeek ? { ...h, [field]: value } : h
     ));
+  };
+
+  const DAYS = [
+    { key: 'monday', label: 'Mon' },
+    { key: 'tuesday', label: 'Tue' },
+    { key: 'wednesday', label: 'Wed' },
+    { key: 'thursday', label: 'Thu' },
+    { key: 'friday', label: 'Fri' },
+    { key: 'saturday', label: 'Sat' },
+    { key: 'sunday', label: 'Sun' },
+  ];
+
+  const toggleWorkingDay = (staffId: string, day: string) => {
+    setStaffSchedules(prev => prev.map(s => {
+      if (s.id !== staffId) return s;
+      const days = s.working_days.includes(day)
+        ? s.working_days.filter(d => d !== day)
+        : [...s.working_days, day];
+      return { ...s, working_days: days };
+    }));
+  };
+
+  const updateStaffLocal = (staffId: string, field: 'start_time' | 'end_time', value: string) => {
+    setStaffSchedules(prev => prev.map(s =>
+      s.id === staffId ? { ...s, [field]: value } : s
+    ));
+  };
+
+  const saveStaffSchedule = async (staff: StaffSchedule) => {
+    setSavingStaff(staff.id);
+    await supabase
+      .from('staff')
+      .update({
+        working_days: staff.working_days,
+        start_time: staff.start_time,
+        end_time: staff.end_time,
+      })
+      .eq('id', staff.id);
+    setSavingStaff(null);
+    setStaffSaved(staff.id);
+    setTimeout(() => setStaffSaved(null), 2000);
   };
 
   const updateStatus = async (id: string, status: string) => {
@@ -642,94 +704,119 @@ export default function AdminDashboard() {
       {activeView === 'settings' ? (
         /* Settings view */
         <div className="admin-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '20px 32px' }}>
+          {/* Per-Barber Schedule Panel */}
           <div style={{ background: '#0c0c0c', border: '1px solid #181818', marginBottom: 20 }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #181818' }}>
               <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '0.1em', color: '#F2F2F2' }}>
-                Business Hours
+                Barber Schedules
               </div>
               <div style={{ fontSize: '0.68rem', color: '#444', marginTop: 2 }}>
-                Set your regular opening hours for each day of the week
+                Set working days and hours for each barber
               </div>
             </div>
-            <div style={{ padding: '12px 20px' }}>
-              {businessHours.map(row => {
-                const isSaving = savingDay === row.day_of_week;
-                const isSaved  = hoursSaved === row.day_of_week;
+
+            <div style={{ padding: '10px 20px 0', display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 160, flexShrink: 0 }} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                {DAYS.map(d => (
+                  <div key={d.key} style={{
+                    width: 36, textAlign: 'center',
+                    fontSize: '0.62rem', color: '#555',
+                    letterSpacing: '0.08em', textTransform: 'uppercase',
+                  }}>
+                    {d.label}
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: '0.62rem', color: '#555', letterSpacing: '0.08em', textTransform: 'uppercase', width: 60, textAlign: 'center' }}>Opens</span>
+                <span style={{ fontSize: '0.62rem', color: '#555', letterSpacing: '0.08em', textTransform: 'uppercase', width: 16, textAlign: 'center' }}></span>
+                <span style={{ fontSize: '0.62rem', color: '#555', letterSpacing: '0.08em', textTransform: 'uppercase', width: 60, textAlign: 'center' }}>Closes</span>
+              </div>
+            </div>
+
+            <div style={{ padding: '8px 20px 16px' }}>
+              {staffSchedules.map(staff => {
+                const isSaving = savingStaff === staff.id;
+                const isSaved  = staffSaved === staff.id;
                 return (
                   <div
-                    key={row.day_of_week}
+                    key={staff.id}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 16,
                       padding: '12px 0', borderBottom: '1px solid #161616',
                       flexWrap: 'wrap',
                     }}
                   >
-                    <div style={{
-                      fontFamily: 'Bebas Neue, sans-serif', fontSize: '0.95rem',
-                      letterSpacing: '0.08em', color: row.is_closed ? '#333' : '#F2F2F2',
-                      width: 100, flexShrink: 0, transition: 'color 0.2s',
-                    }}>
-                      {DAY_NAMES[row.day_of_week]}
+                    <div style={{ width: 160, flexShrink: 0 }}>
+                      <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '0.9rem', letterSpacing: '0.08em', color: '#F2F2F2' }}>
+                        {staff.name}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: '#555', marginTop: 1 }}>
+                        {staff.role}
+                      </div>
                     </div>
-                    <button
-                      onClick={() => updateHoursLocal(row.day_of_week, 'is_closed', !row.is_closed)}
-                      style={{
-                        padding: '5px 14px', cursor: 'pointer', fontSize: '0.68rem',
-                        letterSpacing: '0.08em', fontFamily: 'DM Sans, sans-serif',
-                        transition: 'all 0.15s', flexShrink: 0,
-                        background: row.is_closed ? 'rgba(248,113,113,0.08)' : 'rgba(74,222,128,0.08)',
-                        border: row.is_closed ? '1px solid #f8717133' : '1px solid #4ade8033',
-                        color: row.is_closed ? '#f87171' : '#4ade80',
-                      }}
-                    >
-                      {row.is_closed ? 'Closed' : 'Open'}
-                    </button>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {DAYS.map(d => {
+                        const active = staff.working_days.includes(d.key);
+                        return (
+                          <button
+                            key={d.key}
+                            onClick={() => toggleWorkingDay(staff.id, d.key)}
+                            style={{
+                              width: 36, height: 36, cursor: 'pointer',
+                              fontSize: '0.68rem', fontFamily: 'DM Sans, sans-serif',
+                              letterSpacing: '0.05em', transition: 'all 0.15s',
+                              background: active ? 'rgba(201,168,76,0.12)' : '#111',
+                              border: active ? '1px solid #C9A84C55' : '1px solid #222',
+                              color: active ? '#C9A84C' : '#333',
+                            }}
+                          >
+                            {d.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input
                         type="time"
-                        value={row.open_time?.substring(0, 5) ?? '09:00'}
-                        disabled={row.is_closed}
-                        onChange={e => updateHoursLocal(row.day_of_week, 'open_time', e.target.value)}
+                        value={String(staff.start_time).substring(0, 5)}
+                        onChange={e => updateStaffLocal(staff.id, 'start_time', e.target.value)}
                         style={{
                           background: '#181818', border: '1px solid #2a2a2a',
-                          color: row.is_closed ? '#333' : '#F2F2F2',
-                          padding: '6px 10px', fontSize: '0.82rem',
-                          fontFamily: 'DM Sans, sans-serif', outline: 'none',
-                          opacity: row.is_closed ? 0.4 : 1,
-                          colorScheme: 'dark',
+                          color: '#F2F2F2', padding: '6px 10px',
+                          fontSize: '0.82rem', fontFamily: 'DM Sans, sans-serif',
+                          outline: 'none', width: 60, colorScheme: 'dark',
                         }}
                       />
                       <span style={{ color: '#444', fontSize: '0.8rem' }}>to</span>
                       <input
                         type="time"
-                        value={row.close_time?.substring(0, 5) ?? '18:00'}
-                        disabled={row.is_closed}
-                        onChange={e => updateHoursLocal(row.day_of_week, 'close_time', e.target.value)}
+                        value={String(staff.end_time).substring(0, 5)}
+                        onChange={e => updateStaffLocal(staff.id, 'end_time', e.target.value)}
                         style={{
                           background: '#181818', border: '1px solid #2a2a2a',
-                          color: row.is_closed ? '#333' : '#F2F2F2',
-                          padding: '6px 10px', fontSize: '0.82rem',
-                          fontFamily: 'DM Sans, sans-serif', outline: 'none',
-                          opacity: row.is_closed ? 0.4 : 1,
-                          colorScheme: 'dark',
+                          color: '#F2F2F2', padding: '6px 10px',
+                          fontSize: '0.82rem', fontFamily: 'DM Sans, sans-serif',
+                          outline: 'none', width: 60, colorScheme: 'dark',
                         }}
                       />
+                      <button
+                        onClick={() => saveStaffSchedule(staff)}
+                        disabled={isSaving}
+                        style={{
+                          padding: '6px 18px', cursor: isSaving ? 'not-allowed' : 'pointer',
+                          fontSize: '0.68rem', letterSpacing: '0.08em',
+                          fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
+                          background: isSaved ? 'rgba(74,222,128,0.08)' : 'none',
+                          border: isSaved ? '1px solid #4ade8033' : '1px solid #2a2a2a',
+                          color: isSaved ? '#4ade80' : '#777',
+                          opacity: isSaving ? 0.5 : 1,
+                        }}
+                      >
+                        {isSaving ? 'Saving...' : isSaved ? 'Saved \u2713' : 'Save'}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => saveBusinessHours(row)}
-                      disabled={isSaving}
-                      style={{
-                        padding: '6px 18px', cursor: isSaving ? 'not-allowed' : 'pointer',
-                        fontSize: '0.68rem', letterSpacing: '0.08em',
-                        fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
-                        background: isSaved ? 'rgba(74,222,128,0.08)' : 'none',
-                        border: isSaved ? '1px solid #4ade8033' : '1px solid #2a2a2a',
-                        color: isSaved ? '#4ade80' : '#777',
-                        opacity: isSaving ? 0.5 : 1, flexShrink: 0,
-                      }}
-                    >
-                      {isSaving ? 'Saving...' : isSaved ? 'Saved \u2713' : 'Save'}
-                    </button>
                   </div>
                 );
               })}
