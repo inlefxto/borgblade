@@ -432,6 +432,14 @@ export default function AdminDashboard() {
     if (data) setStaffSchedules(data as StaffSchedule[]);
   }, []);
 
+  const fetchClosedDates = useCallback(async () => {
+    const { data } = await supabase
+      .from('closed_dates')
+      .select('*')
+      .order('date');
+    if (data) setClosedDates(data as ClosedDate[]);
+  }, []);
+
   useEffect(() => {
     if (authed) {
       fetchBookings();
@@ -593,14 +601,6 @@ export default function AdminDashboard() {
       };
     }));
   };
-
-  const fetchClosedDates = useCallback(async () => {
-    const { data } = await supabase
-      .from('closed_dates')
-      .select('*')
-      .order('date');
-    if (data) setClosedDates(data as ClosedDate[]);
-  }, []);
 
   const addClosedDate = async () => {
     if (!newClosedDate) return;
