@@ -388,7 +388,8 @@ export default function AdminDashboard() {
   const [addingClosedDate, setAddingClosedDate] = useState(false);
   const [deletingClosedDate, setDeletingClosedDate] = useState<number | null>(null);
   const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
-  const [blockMode, setBlockMode] = useState<'single' | 'from' | 'fullday'>('single');
+  const [blockMode, setBlockMode] = useState<'single' | 'from' | 'fullday' | 'custom'>('single');
+  const [blockEndTime, setBlockEndTime] = useState('');
   const [blockStaffId, setBlockStaffId] = useState<string>('all');
   const [blockDate, setBlockDate] = useState('');
   const [blockTime, setBlockTime] = useState('');
@@ -667,6 +668,8 @@ export default function AdminDashboard() {
       slotsToBlock = [blockTime];
     } else if (blockMode === 'from') {
       slotsToBlock = ALL_TIME_SLOTS.filter(s => s >= blockTime);
+    } else if (blockMode === 'custom') {
+      slotsToBlock = ALL_TIME_SLOTS.filter(s => s < blockTime || s >= blockEndTime);
     } else {
       slotsToBlock = [...ALL_TIME_SLOTS];
     }
@@ -682,6 +685,7 @@ export default function AdminDashboard() {
 
     setBlockDate('');
     setBlockTime('');
+    setBlockEndTime('');
     setBlockReason('');
     setBlockStaffId('all');
     setBlockMode('single');
@@ -1153,10 +1157,11 @@ export default function AdminDashboard() {
                   { key: 'single',  label: 'Single Slot' },
                   { key: 'from',    label: 'From Time Onwards' },
                   { key: 'fullday', label: 'Full Day' },
+                  { key: 'custom',  label: 'Custom Hours' },
                 ] as const).map(m => (
                   <button
                     key={m.key}
-                    onClick={() => { setBlockMode(m.key); setBlockTime(''); }}
+                    onClick={() => { setBlockMode(m.key); setBlockTime(''); setBlockEndTime(''); }}
                     style={{
                       padding: '6px 14px', cursor: 'pointer',
                       fontSize: '0.72rem', letterSpacing: '0.08em',
@@ -1219,7 +1224,7 @@ export default function AdminDashboard() {
                 {blockMode !== 'fullday' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <label style={{ fontSize: '0.62rem', color: '#C9A84C', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                      {blockMode === 'from' ? 'From Time' : 'Time Slot'}
+                      {blockMode === 'from' ? 'From Time' : blockMode === 'custom' ? 'Start Time' : 'Time Slot'}
                     </label>
                     <select
                       value={blockTime}
@@ -1227,6 +1232,32 @@ export default function AdminDashboard() {
                       style={{
                         background: '#181818', border: '1px solid #2a2a2a',
                         color: blockTime ? '#F2F2F2' : '#555',
+                        padding: '8px 12px', fontSize: '0.85rem',
+                        fontFamily: 'DM Sans, sans-serif', outline: 'none',
+                        colorScheme: 'dark', appearance: 'none',
+                        WebkitAppearance: 'none', minWidth: 120,
+                      }}
+                    >
+                      <option value="">Select time</option>
+                      {ALL_TIME_SLOTS.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* End time — only for Custom Hours */}
+                {blockMode === 'custom' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: '0.62rem', color: '#C9A84C', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                      End Time
+                    </label>
+                    <select
+                      value={blockEndTime}
+                      onChange={e => setBlockEndTime(e.target.value)}
+                      style={{
+                        background: '#181818', border: '1px solid #2a2a2a',
+                        color: blockEndTime ? '#F2F2F2' : '#555',
                         padding: '8px 12px', fontSize: '0.85rem',
                         fontFamily: 'DM Sans, sans-serif', outline: 'none',
                         colorScheme: 'dark', appearance: 'none',
@@ -1263,15 +1294,20 @@ export default function AdminDashboard() {
                 {/* Block button */}
                 <button
                   onClick={addBlockedSlots}
-                  disabled={!blockDate || (blockMode !== 'fullday' && !blockTime) || addingBlock}
+                  disabled={
+                    !blockDate ||
+                    (blockMode !== 'fullday' && !blockTime) ||
+                    (blockMode === 'custom' && !blockEndTime) ||
+                    addingBlock
+                  }
                   style={{
                     padding: '8px 20px', flexShrink: 0,
-                    background: (blockDate && (blockMode === 'fullday' || blockTime)) ? '#C9A84C' : '#1e1e1e',
+                    background: (blockDate && (blockMode === 'fullday' || blockTime) && (blockMode !== 'custom' || blockEndTime)) ? '#C9A84C' : '#1e1e1e',
                     border: 'none',
-                    color: (blockDate && (blockMode === 'fullday' || blockTime)) ? '#0A0A0A' : '#444',
+                    color: (blockDate && (blockMode === 'fullday' || blockTime) && (blockMode !== 'custom' || blockEndTime)) ? '#0A0A0A' : '#444',
                     fontFamily: 'Bebas Neue, sans-serif',
                     fontSize: '0.95rem', letterSpacing: '0.08em',
-                    cursor: (blockDate && (blockMode === 'fullday' || blockTime)) ? 'pointer' : 'not-allowed',
+                    cursor: (blockDate && (blockMode === 'fullday' || blockTime) && (blockMode !== 'custom' || blockEndTime)) ? 'pointer' : 'not-allowed',
                     transition: 'all 0.15s',
                     opacity: addingBlock ? 0.6 : 1,
                   }}
