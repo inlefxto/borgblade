@@ -60,6 +60,17 @@ interface AnalyticsBooking {
   staff: { name: string } | null;
 }
 
+interface ClientBooking {
+  id: string;
+  booking_date: string;
+  status: string;
+  client_name: string;
+  client_email: string;
+  client_phone: string;
+  services: { name: string } | null;
+  staff: { name: string } | null;
+}
+
 interface BlockedSlot {
   id: number;
   date: string;
@@ -407,7 +418,7 @@ export default function AdminDashboard() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [addModal, setAddModal] = useState<{ barberId: string; barberName: string } | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
-  const [activeView, setActiveView] = useState<'bookings' | 'settings' | 'analytics'>('bookings');
+  const [activeView, setActiveView] = useState<'bookings' | 'settings' | 'analytics' | 'clients'>('bookings');
   const [analyticsData, setAnalyticsData] = useState<AnalyticsBooking[]>([]);
   const [analyticsPeriod, setAnalyticsPeriod] = useState<'today' | 'week' | 'month' | 'pick-month' | 'pick-week' | 'range'>('week');
   const [analyticsPickedMonth, setAnalyticsPickedMonth] = useState(() => {
@@ -418,6 +429,9 @@ export default function AdminDashboard() {
   const [analyticsRangeFrom, setAnalyticsRangeFrom] = useState('');
   const [analyticsRangeTo, setAnalyticsRangeTo] = useState('');
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [clientsData, setClientsData] = useState<ClientBooking[]>([]);
+  const [clientSearch, setClientSearch] = useState('');
+  const [loadingClients, setLoadingClients] = useState(false);
   const [businessHours, setBusinessHours] = useState<BusinessHours[]>([]);
   const [savingDay, setSavingDay] = useState<number | null>(null);
   const [hoursSaved, setHoursSaved] = useState<number | null>(null);
@@ -543,6 +557,17 @@ export default function AdminDashboard() {
     setLoadingAnalytics(false);
   }, []);
 
+  const fetchClients = useCallback(async () => {
+    setLoadingClients(true);
+    const { data } = await supabase
+      .from('bookings')
+      .select('id, booking_date, status, client_name, client_email, client_phone, services(name), staff(name)')
+      .neq('status', 'cancelled')
+      .order('booking_date', { ascending: false });
+    if (data) setClientsData(data as ClientBooking[]);
+    setLoadingClients(false);
+  }, []);
+
   const weekInputToRange = (weekStr: string): { from: string; to: string } => {
     const parts = weekStr.split('-W');
     if (parts.length !== 2) return { from: '', to: '' };
@@ -617,9 +642,10 @@ export default function AdminDashboard() {
         fetchClosedDates();
         fetchBlockedSlots();
         fetchAnalytics();
+        fetchClients();
       });
     }
-  }, [authed, fetchBookings, fetchServices, fetchBusinessHours, fetchStaffSchedules, fetchClosedDates, fetchBlockedSlots, fetchAnalytics]);
+  }, [authed, fetchBookings, fetchServices, fetchBusinessHours, fetchStaffSchedules, fetchClosedDates, fetchBlockedSlots, fetchAnalytics, fetchClients]);
 
   // ── Login screen ──────────────────────────────────────────────────────────
 
@@ -1013,6 +1039,17 @@ export default function AdminDashboard() {
               }}
             >Show Completed</button>
             <button
+              onClick={() => setActiveView(v => v === 'clients' ? 'bookings' : 'clients')}
+              style={{
+                background: activeView === 'clients' ? 'rgba(201,168,76,0.1)' : 'none',
+                border: activeView === 'clients' ? '1px solid #C9A84C55' : '1px solid #1e1e1e',
+                color: activeView === 'clients' ? '#C9A84C' : '#555',
+                padding: '5px 14px', cursor: 'pointer', fontSize: '0.7rem',
+                letterSpacing: '0.08em', fontFamily: 'DM Sans, sans-serif',
+                transition: 'all 0.15s', whiteSpace: 'nowrap',
+              }}
+            >Clients</button>
+            <button
               onClick={() => setActiveView(v => v === 'analytics' ? 'bookings' : 'analytics')}
               style={{
                 background: activeView === 'analytics' ? 'rgba(201,168,76,0.1)' : 'none',
@@ -1084,7 +1121,148 @@ export default function AdminDashboard() {
         >&#8250;</button>
       </div>
 
-      {activeView === 'analytics' ? (
+      {activeView === 'clients' ? (
+        <div className="admin-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '20px 32px' }}>
+          {(() => {
+            const clientMap: Record<string, {
+              name: string; email: string; phone: string;
+              visits: number; lastVisit: string;
+              serviceCounts: Record<string, number>;
+              barberCounts: Record<string, number>;
+            }> = {};
+
+            clientsData.forEach(b => {
+              const key = b.client_email?.toLowerCase() || b.client_name?.toLowerCase();
+              if (!key) return;
+              if (!clientMap[key]) {
+                clientMap[key] = {
+                  name: b.client_name, email: b.client_email,
+                  phone: b.client_phone, visits: 0, lastVisit: '',
+                  serviceCounts: {}, barberCounts: {},
+                };
+              }
+              clientMap[key].visits++;
+              if (b.booking_date <= todayStr() && b.booking_date > clientMap[key].lastVisit) {
+                clientMap[key].lastVisit = b.booking_date;
+              }
+              if (b.services?.name) {
+                clientMap[key].serviceCounts[b.services.name] =
+                  (clientMap[key].serviceCounts[b.services.name] || 0) + 1;
+              }
+              if (b.staff?.name) {
+                clientMap[key].barberCounts[b.staff.name] =
+                  (clientMap[key].barberCounts[b.staff.name] || 0) + 1;
+              }
+            });
+
+            const clients = Object.values(clientMap)
+              .map(c => ({
+                ...c,
+                favouriteService: Object.entries(c.serviceCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '—',
+                favouriteBarber:  Object.entries(c.barberCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '—',
+              }))
+              .sort((a, b) => b.visits - a.visits);
+
+            const filtered = clients.filter(c =>
+              !clientSearch ||
+              c.name?.toLowerCase().includes(clientSearch.toLowerCase()) ||
+              c.email?.toLowerCase().includes(clientSearch.toLowerCase()) ||
+              c.phone?.includes(clientSearch)
+            );
+
+            return (
+              <>
+                {/* Header + search */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1.4rem', letterSpacing: '0.1em', color: '#F2F2F2' }}>
+                      Client Directory
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#444', marginTop: 2 }}>
+                      {clients.length} total clients · {clientsData.length} bookings on record
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      value={clientSearch}
+                      onChange={e => setClientSearch(e.target.value)}
+                      placeholder="Search by name, email or phone..."
+                      style={{
+                        background: '#111', border: '1px solid #222',
+                        color: '#F2F2F2', padding: '8px 14px',
+                        fontSize: '0.85rem', fontFamily: 'DM Sans, sans-serif',
+                        outline: 'none', width: 280,
+                      }}
+                      onFocus={e => { e.currentTarget.style.borderColor = '#C9A84C55'; }}
+                      onBlur={e => { e.currentTarget.style.borderColor = '#222'; }}
+                    />
+                    {clientSearch && (
+                      <button
+                        onClick={() => setClientSearch('')}
+                        style={{ background: 'none', border: '1px solid #222', color: '#555', padding: '8px 12px', cursor: 'pointer', fontSize: '0.78rem', fontFamily: 'DM Sans, sans-serif' }}
+                      >Clear</button>
+                    )}
+                    <button
+                      onClick={fetchClients}
+                      style={{ background: 'none', border: '1px solid #1e1e1e', color: '#555', padding: '8px 14px', cursor: 'pointer', fontSize: '0.7rem', letterSpacing: '0.08em', fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s' }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#F2F2F2'; e.currentTarget.style.borderColor = '#444'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#1e1e1e'; }}
+                    >Refresh</button>
+                  </div>
+                </div>
+
+                {loadingClients ? (
+                  <div style={{ textAlign: 'center', padding: '60px', color: '#333', fontSize: '0.82rem', letterSpacing: '0.1em' }}>Loading...</div>
+                ) : filtered.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '60px', color: '#333', fontSize: '0.82rem' }}>
+                    {clientSearch ? 'No clients match your search' : 'No clients yet'}
+                  </div>
+                ) : (
+                  <div style={{ background: '#0c0c0c', border: '1px solid #181818' }}>
+                    {/* Table header */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 110px 180px 140px 60px', gap: 12, padding: '10px 20px', borderBottom: '1px solid #1a1a1a' }}>
+                      {['Client', 'Contact', 'Last Visit', 'Favourite Service', 'Barber', 'Visits'].map(h => (
+                        <div key={h} style={{ fontSize: '0.6rem', color: '#555', letterSpacing: '0.1em', textTransform: 'uppercase', textAlign: h === 'Visits' ? 'right' : 'left' }}>{h}</div>
+                      ))}
+                    </div>
+                    {/* Rows */}
+                    {filtered.map(client => (
+                      <div
+                        key={client.email || client.name}
+                        style={{ display: 'grid', gridTemplateColumns: '1fr 160px 110px 180px 140px 60px', gap: 12, padding: '14px 20px', borderBottom: '1px solid #161616', alignItems: 'center', transition: 'background 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#0e0e0e'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <div>
+                          <div style={{ fontSize: '0.88rem', color: '#F2F2F2', fontFamily: 'DM Sans, sans-serif', fontWeight: 500 }}>{client.name}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#555', marginTop: 2 }}>{client.email}</div>
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#888', fontFamily: 'DM Sans, sans-serif' }}>{client.phone || '—'}</div>
+                        <div style={{ fontSize: '0.78rem', color: client.lastVisit ? '#888' : '#333', fontFamily: 'DM Sans, sans-serif' }}>
+                          {client.lastVisit
+                            ? new Date(client.lastVisit + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                            : 'Upcoming'}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#C9A84C', fontFamily: 'DM Sans, sans-serif' }}>{client.favouriteService}</div>
+                        <div style={{ fontSize: '0.78rem', color: '#888', fontFamily: 'DM Sans, sans-serif' }}>{client.favouriteBarber}</div>
+                        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1.2rem', color: client.visits >= 5 ? '#C9A84C' : '#555', textAlign: 'right' }}>{client.visits}</div>
+                      </div>
+                    ))}
+                    {/* Footer */}
+                    <div style={{ padding: '12px 20px', borderTop: '1px solid #181818', display: 'flex', gap: 24 }}>
+                      <span style={{ fontSize: '0.68rem', color: '#444' }}>Showing {filtered.length} of {clients.length} clients</span>
+                      {clientSearch && <span style={{ fontSize: '0.68rem', color: '#C9A84C' }}>Filtered by "{clientSearch}"</span>}
+                      <span style={{ fontSize: '0.68rem', color: '#444', marginLeft: 'auto' }}>Gold visit count = 5+ visits (regulars)</span>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+
+      ) : activeView === 'analytics' ? (
         <div className="admin-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '20px 32px' }}>
           {(() => {
             const now = new Date();
