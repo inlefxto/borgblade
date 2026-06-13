@@ -145,7 +145,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           to: [clientEmail],
           subject: `Reminder — Your appointment tomorrow at ${time}`,
           html: reminderHtml,
-          scheduledAt: `in ${hoursUntilReminder} hours`,
+          scheduled_at: `in ${hoursUntilReminder} hours`,
         }),
       });
       const reminderData = await reminderRes.json();
