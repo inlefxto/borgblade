@@ -133,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const apptTime = new Date(Date.UTC(y, m - 1, d, h, min));
     const hoursUntil = (apptTime.getTime() - Date.now()) / (1000 * 60 * 60);
     if (hoursUntil > 25) {
-      const reminderTime = new Date(apptTime.getTime() - 24 * 60 * 60 * 1000);
+      const hoursUntilReminder = Math.floor(hoursUntil - 24);
       const reminderRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -145,7 +145,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           to: [clientEmail],
           subject: `Reminder — Your appointment tomorrow at ${time}`,
           html: reminderHtml,
-          scheduledAt: reminderTime.toISOString(),
+          scheduledAt: `in ${hoursUntilReminder} hours`,
         }),
       });
       const reminderData = await reminderRes.json();
